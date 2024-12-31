@@ -1,0 +1,7 @@
+These installs have already been done on your robot.  Mainly a reminder for me.
+
+sudo apt-get -y install git build-essential cmake pkg-config checkinstall
+sudo apt install libopencv-dev python3-opencv
+
+
+

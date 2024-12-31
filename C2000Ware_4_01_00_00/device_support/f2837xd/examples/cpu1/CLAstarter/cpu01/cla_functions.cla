@@ -1,0 +1,217 @@
+//#############################################################################
+//#############################################################################
+
+//
+// Included Files
+//
+#include <CLAmath.h>
+#include "cla_shared.h"
+
+//---------------------------------------------------------------------------
+// Include any other Header Files
+//
+#include "F2837xD_Cla_typedefs.h"        // CLA type definitions
+#include "F2837xD_device.h"              // F2837xD header file peripheral address definitions
+
+//
+// Defines
+//
+#define PI                      3.14159
+#define TWO_PI                  2.0*PI
+
+//
+// Globals
+//
+int32_t times1;
+int32_t times2;
+int32_t times3;
+int32_t times4;
+int32_t times5;
+int32_t times6;
+int32_t times7;
+int32_t times8;
+float tempvalue;
+
+void setEPWM6Acla(float u);
+void setEPWM6Bcla(float u);
+
+//
+// Function Definitions  left a few examples here to remind how to do things on the CLA
+//
+float DANfloor(float myf) {
+	int32_t myi;
+	if (myf < 0) {
+		myi = (int32_t)(myf - 1.0);
+	} else {
+		myi = (int32_t)myf;
+	}
+	return ((float)myi);
+}
+
+float DANceil(float myf) {
+	int32_t myi;
+	if (myf < 0) {
+		myi = (int32_t)(myf);
+	} else {
+		myi = (int32_t)(myf + 1.0);
+	}
+	return ((float)myi);
+}
+
+// this is partial code balancing inverted pendulum.  Left the code here as help to see how to write your own code for CLA
+__interrupt void Cla1Task1 ( void )
+{
+    //Local Variables
+//    __mdebugstop();
+	float x1,x2,x1dot,x2dot;
+	float x2mod;
+	float K1 = 5.5782;
+	float K2 = 3.1879;
+	float K3 = 90.0779;
+	float K4 = 11.9270;
+	float Vpos = 0.017;
+	float Vneg = 0.017;
+	float Cpos = 1.1;
+	float Cneg = 1.1;
+    int32_t CLA_enc1Raw = 0;
+    int32_t CLA_enc2Raw = 0;	
+
+    CLAreturn_Value = 3.0*CLAsin(.05*2*PI*CLAin_Value);
+    times1++;
+    numtimes1 = times1;
+
+    if ((times1%200)==0) {
+        GpioDataRegs.GPFTOGGLE.bit.GPIO160 = 1; // Toggle LED16
+    }
+	
+    CLA_enc1Raw = EQep1Regs.QPOSCNT;
+    CLA_enc1 = CLA_enc1Raw*2*PI/2400;
+    CLA_enc2Raw = EQep2Regs.QPOSCNT;
+    CLA_enc2 = -(CLA_enc2Raw*2*PI/2400)+PI;
+
+//	__mdebugstop();
+    x1= CLA_enc1 - setpt;
+	x1dot=.6*x1dot_old+80*CLA_enc1-80*x1old;
+
+	x2=CLA_enc2;
+
+	if (x2 > PI) {
+		x2mod = x2 - 2.0*PI*DANfloor((x2+PI)/(2*PI));
+	}
+	else if (x2 < -PI) {
+		x2mod = x2 - 2.0*PI*DANceil((x2-PI)/(2*PI));
+	}
+	else {
+		x2mod = x2;
+	}
+
+	x2dot=.6*x2dot_old+80*x2-80*x2old;
+
+	CLA_u = K1*x1+K2*x1dot+K3*x2mod+K4*x2dot;
+
+	if (x1dot > 0.0) {
+		CLA_u = CLA_u + Vpos*x1dot + Cpos;
+	}
+	if (x1dot < 0.0) {
+		CLA_u = CLA_u + Vneg*x1dot + Cneg;
+	}
+
+//	saturation
+	if (CLA_u >  10) CLA_u =  10;
+	if (CLA_u <- 10) CLA_u = -10;
+
+	x1old = CLA_enc1;
+	x1dot_old = x1dot;
+	x2old = x2;
+	x2dot_old = x2dot;
+
+	// For debugging
+//	CLA_u = 5;
+//	CLA_u = CLA_u + numtimes1*0.001;
+
+	setEPWM6Acla(CLA_u);
+    setEPWM6Bcla(CLA_u);
+}
+
+__interrupt void Cla1Task2 ( void )
+{
+	times2++;
+	numtimes2 = times2;
+}
+
+__interrupt void Cla1Task3 ( void )
+{
+	times3++;
+	numtimes3 = times3;
+}
+
+__interrupt void Cla1Task4 ( void )
+{
+	times4++;
+	numtimes4 = times4;
+}
+
+__interrupt void Cla1Task5 ( void )
+{
+	times5++;
+	numtimes5 = times5;
+}
+
+__interrupt void Cla1Task6 ( void )
+{
+	times6++;
+	numtimes6 = times6;
+}
+
+__interrupt void Cla1Task7 ( void )
+{
+	times7++;
+	numtimes7 = times7;
+}
+
+__interrupt void Cla1Task8 ( void )
+{
+	times8++;
+	numtimes8 = times8;
+}
+
+void setEPWM6Acla(float u)
+{
+    float pwmCountMax = 2500.0;
+    float pwmVal = 0;
+
+    if (u >  10) u =  10;
+    if (u < -10) u = -10;
+
+    if (u>0) {
+        GpioDataRegs.GPACLEAR.bit.GPIO29 = 1;
+    } else {
+        GpioDataRegs.GPASET.bit.GPIO29 = 1;
+    }
+    pwmVal = fabs(u) * (pwmCountMax / 10.0);
+
+    // set compareA compare value
+    EPwm6Regs.CMPA.bit.CMPA = (int)pwmVal;
+}
+
+void setEPWM6Bcla(float u)
+{
+    float pwmCountMax = 2500.0;
+    float pwmVal = 0;
+
+    if (u >  10) u =  10;
+    if (u < -10) u = -10;
+
+    if (u>0) {
+        GpioDataRegs.GPBCLEAR.bit.GPIO32 = 1;
+    } else {
+        GpioDataRegs.GPBSET.bit.GPIO32 = 1;
+    }
+    pwmVal = fabs(u) * (pwmCountMax / 10.0);
+
+    // set compareA compare value
+    EPwm6Regs.CMPB.bit.CMPB = (int)pwmVal;
+}
+//
+// End of file
+//

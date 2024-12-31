@@ -1,0 +1,37 @@
+<projectSpec>
+  <project
+        name="f28027_fft_starter"
+        device="TMS320F28027"
+        cgtVersion="20.2.2.LTS"
+        launchWizard="False"
+        linkerCommandFile=""
+	postBuildStep="..\..\..\C2Prog2.x\c2p-cli mkehx --target=28027,23,21_SCI ${ProjName}.out ${ProjName}.ehx"
+        >
+ 
+    <configuration name="CPU_FLASH" compilerBuildOptions="--opt_level=off -I${C2000WARE_COMMON_INCLUDE} -I${C2000WARE_HEADERS_INCLUDE} -I${C2000WARE_FFT_INCLUDE} -I${PROJECT_ROOT} --define=DEBUG --define=_FLASH -ml -mt -v28 --diag_warning=225 --printf_support=full --diag_suppress=10063 --display_error_number" linkerBuildOptions="--stack_size=0x3B0  " />
+    <pathVariable name="C2000WARE_FFT_INCLUDE" path="../../../../../../../libraries/dsp/FixedPoint/c28/include" scope="project" />
+    <pathVariable name="C2000WARE_COMMON_INCLUDE" path="../../../../../common/include/" scope="project" />
+    <pathVariable name="C2000WARE_HEADERS_INCLUDE" path="../../../../../headers/include/" scope="project" />
+    <file action="copy" path="../../../../../common/source/f2802x_codestartbranch.asm" targetDirectory="" />
+    <file action="copy" path="../../../../../common/source/f2802x_defaultisr.c" targetDirectory="" />
+    <file action="copy" path="../../../../../common/source/f2802x_gpio.c" targetDirectory="" />
+	<file action="copy" path="../../../../../common/source/f2802x_epwm.c" targetDirectory="" />
+	<file action="copy" path="../../../../../common/source/f2802x_adc.c" targetDirectory="" />
+	<file action="copy" path="../../../../../common/source/f2802x_cputimers.c" targetDirectory="" />	
+	<file action="copy" path="../../../../../common/source/f2802x_spi.c" targetDirectory="" />
+	<file action="copy" path="../../../../../common/source/f2802x_sci.c" targetDirectory="" />	
+    <file action="copy" path="../../../../../common/source/f2802x_piectrl.c" targetDirectory="" />
+    <file action="copy" path="../../../../../common/source/f2802x_pievect.c" targetDirectory="" />
+    <file action="copy" path="../../../../../common/source/f2802x_sysctrl.c" targetDirectory="" />
+    <file action="copy" path="../../../../../common/targetConfigs/TMS320F28027.ccxml" targetDirectory="targetConfigs" />
+    <file action="link" path="../../../../../../../libraries/dsp/FixedPoint/c28/lib/c28x_fixedpoint_dsp_library.lib" targetDirectory="" />
+    <file action="copy" path="../../../../../common/source/f2802x_usdelay.asm" targetDirectory="" />
+    <file action="copy" path="../../../../../headers/cmd/F2802x_Headers_nonBIOS.cmd" targetDirectory="" />    
+    <file action="copy" path="../../../../../headers/source/F2802x_GlobalVariableDefs.c" targetDirectory="" />
+    	<file action="copy" path="../F28027.cmd" targetDirectory="" />    
+	<file action="copy" path="../buffer.h" targetDirectory="" />
+	<file action="copy" path="../f28027Serial.h" targetDirectory="" />
+	<file action="copy" path="../f28027Serial.c" targetDirectory="" />
+    <file action="copy" path="../f28027_main.c" targetDirectory="" />	
+  </project>
+</projectSpec>

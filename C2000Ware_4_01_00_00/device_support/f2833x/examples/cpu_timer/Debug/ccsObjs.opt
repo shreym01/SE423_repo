@@ -1,0 +1,13 @@
+-lrts2800_fpu32.lib
+"./DSP2833x_ADC_cal.obj"
+"./DSP2833x_CodeStartBranch.obj"
+"./DSP2833x_CpuTimers.obj"
+"./DSP2833x_DefaultIsr.obj"
+"./DSP2833x_GlobalVariableDefs.obj"
+"./DSP2833x_PieCtrl.obj"
+"./DSP2833x_PieVect.obj"
+"./DSP2833x_SysCtrl.obj"
+"./DSP2833x_usDelay.obj"
+"./Example_2833xCpuTimer.obj"
+"E:/yixiaol2/SE423Spring23/C2000Ware_4_01_00_00/device_support/f2833x/common/cmd/28335_RAM_lnk.cmd"
+"E:/yixiaol2/SE423Spring23/C2000Ware_4_01_00_00/device_support/f2833x/headers/cmd/DSP2833x_Headers_nonBIOS.cmd"

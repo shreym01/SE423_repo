@@ -1,0 +1,10 @@
+rm /dev/shm/sem.sem-AstarApp-readfrom-new-path
+rm /dev/shm/sem.sem-AstarApp-sendto-pose-obstacle
+rm /dev/shm/sem.sem-LINUXCMDApp-recvfrom
+rm /dev/shm/sem.sem-LVCOMApp-readfrom
+rm /dev/shm/sem.sem-LVCOMApp-sendto
+rm /dev/shm/sharedmem-AstarApp-readfrom-new-path
+rm /dev/shm/sharedmem-AstarApp-sendto-pose-obstacle
+rm /dev/shm/sharedmem-LINUXCMDApp-recvfrom
+rm /dev/shm/sharedmem-LVCOMApp-readfrom
+rm /dev/shm/sharedmem-LVCOMApp-sendto

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>PWMF28027</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.cdt.managedbuilder.core.genmakebuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>org.eclipse.cdt.managedbuilder.core.ScannerConfigBuilder</name>
+			<triggers>full,incremental,</triggers>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>com.ti.ccstudio.core.ccsNature</nature>
+		<nature>org.eclipse.cdt.core.cnature</nature>
+		<nature>org.eclipse.cdt.managedbuilder.core.managedBuildNature</nature>
+		<nature>org.eclipse.cdt.core.ccnature</nature>
+		<nature>org.eclipse.cdt.managedbuilder.core.ScannerConfigNature</nature>
+	</natures>
+	<variableList>
+		<variable>
+			<name>C2000WARE_COMMON_INCLUDE</name>
+			<value>file:/C:/dan/GitHubs/SE423Spring22/C2000Ware_3_02_00_00_F28379D/device_support/f2802x/common/include</value>
+		</variable>
+		<variable>
+			<name>C2000WARE_HEADERS_INCLUDE</name>
+			<value>file:/C:/dan/GitHubs/SE423Spring22/C2000Ware_3_02_00_00_F28379D/device_support/f2802x/headers/include</value>
+		</variable>
+	</variableList>
+</projectDescription>

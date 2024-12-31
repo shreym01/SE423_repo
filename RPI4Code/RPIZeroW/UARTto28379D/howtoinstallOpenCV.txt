@@ -1,0 +1,16 @@
+sudo apt-get -y install git build-essential cmake pkg-config checkinstall
+sudo apt install libopencv-dev python3-opencv
+
+
+
+but some of this broke USB I think
+sudo apt-get -y update
+# compiler and build tools
+sudo apt-get -y install git build-essential cmake pkg-config checkinstall
+# development files for system wide image codecs
+sudo apt-get -y install libjpeg-dev libpng-dev libtiff-dev
+# Protobuf library and tools for dnn module
+sudo apt-get -y install libprotobuf-dev protobuf-compiler
+# development files for V4L2 to enable web cameras support in videoio module
+dan block  Not sure if I want this
+sudo apt-get -y install libv4l-dev

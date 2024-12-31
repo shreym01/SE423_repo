@@ -1,0 +1,5 @@
+"./device.obj"
+"./source/rfft.obj"
+-lc28x_fixedpoint_dsp_library_fpu32_eabi.lib
+-ldriverlib.lib
+-llibc.a

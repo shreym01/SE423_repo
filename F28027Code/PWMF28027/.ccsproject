@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?ccsproject version="1.0"?>
+<projectOptions>
+	<ccsVersion value="11.0.0"/>
+	<deviceVariant value="TMS320C28XX.TMS320F28027"/>
+	<deviceFamily value="C2000"/>
+	<deviceEndianness value="little"/>
+	<codegenToolVersion value="20.2.5.LTS"/>
+	<isElfFormat value="false"/>
+	<rts value="libc.a"/>
+	<createSlaveProjects value=""/>
+	<templateProperties value="id=labstarter_f28027.projectspec.labstarter_f28027"/>
+	<origin value="C:\dan\omapL138\SE423Spring22\LabRepo\C2000Ware_3_02_00_00_F28379D\device_support\f2802x\examples\structs\labstarter_f28027\cpu\ccs\labstarter_f28027.projectspec"/>
+	<filesToOpen value=""/>
+	<connection value="common/targetdb/connections/TIXDS100v2_Connection.xml"/>
+	<isTargetManual value="true"/>
+</projectOptions>

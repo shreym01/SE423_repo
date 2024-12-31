@@ -1,0 +1,1 @@
+'C:\Program Files\C2Prog 2.x\c2p-cli.exe' mkehx --target=28379,378,377,375D-CPU01_SCI AstarFinalProject.out FlashIt.ehx
