@@ -1,5 +1,5 @@
 //#############################################################################
-// FILE:   LABstarter_main.c
+// FILE:   lab2smwd_main.c
 //
 // TITLE:  Lab Starter
 //#############################################################################
@@ -31,8 +31,10 @@ __interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
 __interrupt void cpu_timer2_isr(void);
 __interrupt void SWI_isr(void);
-void SetLEDsOnOff(int16_t LEDvalue);
-int16_t ReadSwitches(void);
+
+
+void SetLEDsOnOff(int16_t LEDvalue);    //SMWD LED function header
+int16_t ReadSwitches(void);             //SMWD Switch function header
 
 // Count variables
 uint32_t numTimer0calls = 0;
@@ -41,7 +43,7 @@ extern uint32_t numRXA;
 uint16_t UARTPrint = 0;
 
 int32_t numTimer2calls; //SMWD init numTimer2Calls
-int16_t led = 0;
+int16_t led = 0;        //SMWD init led counter
 
 
 void main(void)
@@ -240,7 +242,7 @@ void main(void)
 			
 			//IMPORTANT!! %ld is for an int32_t.  To print an int16_t use %d
             UART_printfLine(1,"Timer2 Calls %ld, %ld, %ld",numTimer2calls, 3*numTimer2calls, ReadSwitches()); //SMWD print numTimer2calls and 3*numTimer2Calls
-			UART_printfLine(2,"T0 %ld,T1 %ld",CpuTimer0.InterruptCount,CpuTimer1.InterruptCount);
+			UART_printfLine(2,"T0 %ld,T1 %ld",CpuTimer0.InterruptCount,CpuTimer1.InterruptCount); //SMWD print timers
 
 			UARTPrint = 0;
         }
@@ -311,55 +313,78 @@ __interrupt void cpu_timer2_isr(void)
 //	if ((CpuTimer2.InterruptCount % 10) == 0) {
 //
 //	}
-    SetLEDsOnOff(ReadSwitches());
-    led++;
+    SetLEDsOnOff(ReadSwitches());               //SMWD Set output of switches to trigger led
+    led++;                                      //SMWD led counter
 }
 
 //SMWD Functions
 
+//SMWD LED Function
 void SetLEDsOnOff(int16_t LEDvalue){
-    if((LEDvalue & 0x1) == 0x1){
-        GpioDataRegs.GPACLEAR.bit.GPIO22 = 1;
-    } else {
-        GpioDataRegs.GPASET.bit.GPIO22 = 1;
+
+    //SMWD LED 1 
+    if((LEDvalue & 0x1) == 0x1){                //SMWD bit check for LED 1
+        GpioDataRegs.GPASET.bit.GPIO22 = 1;     //SMWD Turn on LED 1
+    } else {                                    //SMWD else 
+        GpioDataRegs.GPACLEAR.bit.GPIO22 = 1;   //SMWD Turn off LED 1
     }
-    if((LEDvalue & 0x2) == 0x2){
-        GpioDataRegs.GPCCLEAR.bit.GPIO94 = 1;
-    } else {
-        GpioDataRegs.GPCSET.bit.GPIO94 = 1;
+
+    //SMWD LED 2 
+    if((LEDvalue & 0x2) == 0x2){                //SMWD bit check for LED 2
+        GpioDataRegs.GPCSET.bit.GPIO94 = 1;     //SMWD Turn on LED 2
+    } else {                                    //SMWD else
+        GpioDataRegs.GPCCLEAR.bit.GPIO94 = 1;   //SMWD Turn off LED 2
     }
-    if((LEDvalue & 0x4) == 0x4){
-        GpioDataRegs.GPCCLEAR.bit.GPIO95 = 1;
-    } else {
-        GpioDataRegs.GPCSET.bit.GPIO95 = 1;
+
+    //SMWD LED 3 
+    if((LEDvalue & 0x4) == 0x4){                //SMWD bit check for LED 3
+        GpioDataRegs.GPCSET.bit.GPIO95 = 1;     //SMWD Turn on LED 3
+    } else {                                    //SMWD else
+        GpioDataRegs.GPCCLEAR.bit.GPIO95 = 1;   //SMWD Turn off LED 3
     }
-    if((LEDvalue & 0x8) == 0x8){
-        GpioDataRegs.GPDCLEAR.bit.GPIO97 = 1;
-    } else {
-        GpioDataRegs.GPDSET.bit.GPIO97 = 1;
+
+    //SMWD LED 4 
+    if((LEDvalue & 0x8) == 0x8){                //SMWD bit check for LED 4
+        GpioDataRegs.GPDSET.bit.GPIO97 = 1;     //SMWD Turn on LED 4
+    } else {                                    //SMWD else
+        GpioDataRegs.GPDCLEAR.bit.GPIO97 = 1;   //SMWD Turn off LED 4
     }
-    if((LEDvalue & 0x10) == 0x10){
-        GpioDataRegs.GPDCLEAR.bit.GPIO111 = 1;
-    } else {
-        GpioDataRegs.GPDSET.bit.GPIO111 = 1;
+
+    //SMWD LED 5 
+    if((LEDvalue & 0x10) == 0x10){              //SMWD bit check for LED 5
+        GpioDataRegs.GPDSET.bit.GPIO111 = 1;    //SMWD Turn on LED 5
+    } else {                                    //SMWD else
+        GpioDataRegs.GPDCLEAR.bit.GPIO111 = 1;  //SMWD Turn off LED 5
     }
 }
 
+//SMWD button Function
 int16_t ReadSwitches(void){
-    int16_t button = 0;
-    if (GpioDataRegs.GPEDAT.bit.GPIO157 == 1) {
-        button = button | 0x1;
+    int16_t button = 0;                             //SMWD button number
+    if (GpioDataRegs.GPEDAT.bit.GPIO157 == 1) {     //SMWD Button 1 checker
+        button = button | 0x1;                      //set button 1
+    }
 
+
+
+    if (GpioDataRegs.GPEDAT.bit.GPIO158 == 1) {     //SMWD button 2 checker
+        button = button | 0x2;                      //SMWD button 2 setter
     }
-    if (GpioDataRegs.GPEDAT.bit.GPIO158 == 1) {
-        button = button | 0x2;
+
+
+
+    if (GpioDataRegs.GPEDAT.bit.GPIO159 == 1) {     //SMWD button 3 checker
+        button = button | 0x4;                      //SMWD button 3 setter
     }
-    if (GpioDataRegs.GPEDAT.bit.GPIO159 == 1) {
-        button = button | 0x4;
+
+
+
+    if (GpioDataRegs.GPFDAT.bit.GPIO160 == 1) {     //SMWD button 4 checker
+        button = button | 0x8;                      //SMWD button 4 setter
     }
-    if (GpioDataRegs.GPFDAT.bit.GPIO160 == 1) {
-        button = button | 0x8;
-    }
-    return button;
+
+
+
+    return button;                                  //SMWD return
 }
 
