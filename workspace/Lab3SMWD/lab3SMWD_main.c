@@ -34,6 +34,10 @@ __interrupt void SWI_isr(void);
 
 void setEPWM1A(float controleffort);
 void setEPWM2A(float controleffort);
+void init_eQEPs(void);
+float readEncLeft(void);
+float readEncRight(void);
+float readEncWheel(void);
 
 // Count variables
 uint32_t numTimer0calls = 0;
@@ -44,6 +48,22 @@ uint16_t UARTPrint = 0;
 int16_t updown = 1;
 float updawg = 0;
 int16_t updawG_flag = 0;
+float LeftWheel;
+float RightWheel;
+float left_feet = 0;
+float right_feet = 0;
+float uLeft;
+float uRight;
+float p_old1 = 0;
+float p_current1;
+float p_old2 = 0;
+float p_current2;
+float v1;
+float v2;
+float Vpos = 2.3;
+float Vneg = 2.2;
+float Cpos = 2.116;
+float Cneg = -2.116;
 
 void main(void)
 {
@@ -205,7 +225,7 @@ void main(void)
 
     // Configure CPU-Timer 0, 1, and 2 to interrupt every given period:
     // 200MHz CPU Freq,                       Period (in uSeconds)
-    ConfigCpuTimer(&CpuTimer0, LAUNCHPAD_CPU_FREQUENCY, 10000);
+    ConfigCpuTimer(&CpuTimer0, LAUNCHPAD_CPU_FREQUENCY, 1000);
     ConfigCpuTimer(&CpuTimer1, LAUNCHPAD_CPU_FREQUENCY, 20000);
     ConfigCpuTimer(&CpuTimer2, LAUNCHPAD_CPU_FREQUENCY, 1000);
 
@@ -218,6 +238,8 @@ void main(void)
     init_serialSCIB(&SerialB,19200);
     //    init_serialSCIC(&SerialC,115200);
     //    init_serialSCID(&SerialD,115200);
+    init_eQEPs();
+
 
     //SMWD PWM12
     EPwm12Regs.TBCTL.bit.CTRMODE = 0;   //SMWD Count mode
@@ -292,6 +314,7 @@ void main(void)
     // IDLE loop. Just sit and loop forever (optional):
     while(1)
     {
+
         if (UARTPrint == 1 ) {
             // Normally on the Robot Car we only use the below UART_printfLine functions to write to the
             // on board LCD screen.  This below serial_printf is only used in lab 1 to print to a serial
@@ -299,10 +322,11 @@ void main(void)
             //serial_printf(&SerialA,"Num Timer2:%ld Num SerialRX: %ld\r\n",CpuTimer2.InterruptCount,numRXA);
 
             //IMPORTANT!! %ld is for an int32_t.  To print an int16_t use %d
-            UART_printfLine(1,"Timer2 Calls %ld",CpuTimer2.InterruptCount);
-            UART_printfLine(2,"T0 %ld,T1 %ld",CpuTimer0.InterruptCount,CpuTimer1.InterruptCount);
+            UART_printfLine(1,"v1 %.2f,v2 %.2f",v1, v2);
+            UART_printfLine(2,", wheel %f",readEncWheel());
             UARTPrint = 0;
         }
+
     }
 }
 
@@ -331,8 +355,13 @@ __interrupt void SWI_isr(void) {
 __interrupt void cpu_timer0_isr(void)
 {
     CpuTimer0.InterruptCount++;
+    LeftWheel = readEncLeft();
+    RightWheel = readEncRight();
+    left_feet  = LeftWheel / 9.95;
+    right_feet = RightWheel / 9.95;
 
     numTimer0calls++;
+
 
     //    if ((numTimer0calls%50) == 0) {
     //        PieCtrlRegs.PIEIFR12.bit.INTx9 = 1;  // Manually cause the interrupt for the SWI
@@ -362,22 +391,49 @@ __interrupt void cpu_timer2_isr(void)
     GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
 
     CpuTimer2.InterruptCount++;
+//    uLeft = readEncWheel();
+//    uRight = readEncWheel();
+    uLeft = 0;
+    uRight = 0;
+    p_current1 = left_feet;
+    p_current2 = right_feet;
+    v1 = (p_current1-p_old1) / 0.001;
+    v2 = (p_current2-p_old2) / 0.001;
+    if (v1 > 0.0) {
+        uLeft = uLeft + Vpos * v1 + Cpos;
+    } else {
+        uLeft = uLeft + Vneg * v1 + Cneg;
+    }
+    if (v2 > 0.0) {
+        uRight = uRight + Vpos * v2 + Cpos;
+    } else {
+        uRight = uRight + Vneg * v2  + Cneg;
+    }
 
-    if ((CpuTimer2.InterruptCount % 10) == 0) {
+
+
+    setEPWM1A(uLeft);
+    setEPWM2A(-uRight);
+
+
+
+
+
+    if ((CpuTimer2.InterruptCount % 100) == 0) {
         UARTPrint = 1;
     }
 
-//    if (updown == 1) {
-//        if(EPwm1Regs.CMPA.bit.CMPA == EPwm12Regs.TBPRD ){
-//            updown = 0; //SMWD updawg
-//        }
-//
-//    } else {
-//        if(EPwm1Regs.CMPA.bit.CMPA ==  0){
-//            updown = 1; //SMWD updawg
-//        }
-//
-//    }
+    //    if (updown == 1) {
+    //        if(EPwm1Regs.CMPA.bit.CMPA == EPwm12Regs.TBPRD ){
+    //            updown = 0; //SMWD updawg
+    //        }
+    //
+    //    } else {
+    //        if(EPwm1Regs.CMPA.bit.CMPA ==  0){
+    //            updown = 1; //SMWD updawg
+    //        }
+    //
+    //    }
     if(updawG_flag == 1){
         updawg += 0.005;
         if (updawg >= 10){
@@ -389,9 +445,11 @@ __interrupt void cpu_timer2_isr(void)
             updawG_flag = 1;
         }
     }
+    p_old1 = p_current1;
+    p_old2 = p_current2;
 
-    setEPWM1A(updawg);
-    setEPWM2A(updawg);
+//    setEPWM1A(updawg);
+//    setEPWM2A(updawg);
 
 }
 void setEPWM1A(float controleffort){
@@ -412,4 +470,87 @@ void setEPWM2A(float controleffort){
         controleffort = 10;
     }
     EPwm2Regs.CMPA.bit.CMPA = EPwm2Regs.TBPRD * (0.05 * controleffort + 0.5) ;
+}
+
+void init_eQEPs(void) {
+    // setup eQEP1 pins for input
+    EALLOW;
+    //Disable internal pull-up for the selected output pins for reduced power consumption
+    GpioCtrlRegs.GPAPUD.bit.GPIO20 = 1; // Disable pull-up on GPIO20 (EQEP1A)
+    GpioCtrlRegs.GPAPUD.bit.GPIO21 = 1; // Disable pull-up on GPIO21 (EQEP1B)
+    GpioCtrlRegs.GPAQSEL2.bit.GPIO20 = 2; // Qual every 6 samples
+    GpioCtrlRegs.GPAQSEL2.bit.GPIO21 = 2; // Qual every 6 samples
+    EDIS;
+    // This specifies which of the possible GPIO pins will be EQEP1 functional pins.
+    // Comment out other unwanted lines.
+    GPIO_SetupPinMux(20, GPIO_MUX_CPU1, 1);
+    GPIO_SetupPinMux(21, GPIO_MUX_CPU1, 1);
+    EQep1Regs.QEPCTL.bit.QPEN = 0; // make sure eqep in reset
+    EQep1Regs.QDECCTL.bit.QSRC = 0; // Quadrature count mode
+    EQep1Regs.QPOSCTL.all = 0x0; // Disable eQep Position Compare
+    EQep1Regs.QCAPCTL.all = 0x0; // Disable eQep Capture
+    EQep1Regs.QEINT.all = 0x0; // Disable all eQep interrupts
+    EQep1Regs.QPOSMAX = 0xFFFFFFFF; // use full range of the 32 bit count
+    EQep1Regs.QEPCTL.bit.FREE_SOFT = 2; // EQep uneffected by emulation suspend in Code Composer
+    EQep1Regs.QPOSCNT = 0;
+    EQep1Regs.QEPCTL.bit.QPEN = 1; // Enable EQep
+    EALLOW;
+    // setup QEP2 pins for input
+    //Disable internal pull-up for the selected output pinsfor reduced power consumption
+    GpioCtrlRegs.GPBPUD.bit.GPIO54 = 1; // Disable pull-up on GPIO54 (EQEP2A)
+    GpioCtrlRegs.GPBPUD.bit.GPIO55 = 1; // Disable pull-up on GPIO55 (EQEP2B)
+    GpioCtrlRegs.GPBQSEL2.bit.GPIO54 = 2; // Qual every 6 samples
+    GpioCtrlRegs.GPBQSEL2.bit.GPIO55 = 2; // Qual every 6 samples
+    EDIS;
+    GPIO_SetupPinMux(54, GPIO_MUX_CPU1, 5); // set GPIO54 and eQep2A
+    GPIO_SetupPinMux(55, GPIO_MUX_CPU1, 5); // set GPIO55 and eQep2B
+    EQep2Regs.QEPCTL.bit.QPEN = 0; // make sure qep reset
+    EQep2Regs.QDECCTL.bit.QSRC = 0; // Quadrature count mode
+    EQep2Regs.QPOSCTL.all = 0x0; // Disable eQep Position Compare
+    EQep2Regs.QCAPCTL.all = 0x0; // Disable eQep Capture
+    EQep2Regs.QEINT.all = 0x0; // Disable all eQep interrupts
+    EQep2Regs.QPOSMAX = 0xFFFFFFFF; // use full range of the 32 bit count.
+    EQep2Regs.QEPCTL.bit.FREE_SOFT = 2; // EQep uneffected by emulation suspend
+    EQep2Regs.QPOSCNT = 0;
+    EQep2Regs.QEPCTL.bit.QPEN = 1; // Enable EQep
+    EALLOW;
+    // setup QEP3 pins for input
+    //Disable internal pull-up for the selected output pins for reduced power consumption
+    GpioCtrlRegs.GPAPUD.bit.GPIO6 = 1; // Disable pull-up on GPIO54 (EQEP3A)
+    GpioCtrlRegs.GPAPUD.bit.GPIO7 = 1; // Disable pull-up on GPIO55 (EQEP3B)
+    GpioCtrlRegs.GPAQSEL1.bit.GPIO6 = 2; // Qual every 6 samples
+    GpioCtrlRegs.GPAQSEL1.bit.GPIO7 = 2; // Qual every 6 samples
+    EDIS;
+    GPIO_SetupPinMux(6, GPIO_MUX_CPU1, 5); // set GPIO6 and eQep2A
+    GPIO_SetupPinMux(7, GPIO_MUX_CPU1, 5); // set GPIO7 and eQep2B
+    EQep3Regs.QEPCTL.bit.QPEN = 0; // make sure qep reset
+    EQep3Regs.QDECCTL.bit.QSRC = 0; // Quadrature count mode
+    EQep3Regs.QPOSCTL.all = 0x0; // Disable eQep Position Compare
+    EQep3Regs.QCAPCTL.all = 0x0; // Disable eQep Capture
+    EQep3Regs.QEINT.all = 0x0; // Disable all eQep interrupts
+    EQep3Regs.QPOSMAX = 0xFFFFFFFF; // use full range of the 32 bit count.
+    EQep3Regs.QEPCTL.bit.FREE_SOFT = 2; // EQep uneffected by emulation suspend
+    EQep3Regs.QPOSCNT = 0;
+    EQep3Regs.QEPCTL.bit.QPEN = 1; // Enable EQep
+}
+float readEncLeft(void) {
+    int32_t raw = 0;
+    uint32_t QEP_maxvalue = 0xFFFFFFFFU; //4294967295U
+    raw = EQep1Regs.QPOSCNT;
+    if (raw >= QEP_maxvalue/2) raw -= QEP_maxvalue; // I don't think this is needed and never true
+    return (-raw*(2*PI/40000.0));
+}
+float readEncRight(void) {
+    int32_t raw = 0;
+    uint32_t QEP_maxvalue = 0xFFFFFFFFU; //4294967295U -1 32bit signed int
+    raw = EQep2Regs.QPOSCNT;
+    if (raw >= QEP_maxvalue/2) raw -= QEP_maxvalue; // I don't think this is needed and never true
+    return (raw*(2*PI/40000.0));
+}
+float readEncWheel(void) {
+    int32_t raw = 0;
+    uint32_t QEP_maxvalue = 0xFFFFFFFFU; //4294967295U -1 32bit signed int
+    raw = EQep3Regs.QPOSCNT;
+    if (raw >= QEP_maxvalue/2) raw -= QEP_maxvalue; // I don't think this is needed and never true
+    return (-raw*(2*PI/4000.0));
 }
