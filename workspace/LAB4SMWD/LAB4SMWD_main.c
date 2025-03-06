@@ -33,7 +33,8 @@ __interrupt void cpu_timer2_isr(void);
 __interrupt void SWI_isr(void);
 
 __interrupt void ADCD_ISR (void);
-
+__interrupt void ADCC_ISR (void);
+__interrupt void ADCB_ISR (void);
 void setDACA(float dacouta0);
 void setDACB(float dacouta1);
 
@@ -46,9 +47,16 @@ uint16_t UARTPrint = 0;
 int16_t adcd0result = 0;
 int16_t adcd1result = 0;
 
+int16_t adcc0result = 0;
+int16_t adcc1result = 0;
+int16_t adcc2result = 0;
+int16_t adcc3result = 0;
+
+int16_t adcbresult = 0;
+
 float xk = 0;
-const int16_t n = 22;
-float xks[n] = {0};
+#define nSIZE 22
+float xks[nSIZE] = {0};
 //float xk_1 = 0;
 //float xk_2 = 0;
 //float xk_3 = 0;
@@ -83,8 +91,26 @@ float b[] ={    -2.3890045153263611e-03,
 float scaled0 = 0;
 float scaled1 = 0;
 
-int32_t adcdCount = 0;
+float scaledc0 = 0;
+float scaledc1 = 0;
+float scaledc2 = 0;
+float scaledc3 = 0;
 
+float scaledb = 0;
+
+float z4 = 0;
+float x4 = 0;
+float Z = 0;
+float X = 0;
+
+float sum4Z = 0;
+float sum4X = 0;
+float sumZ = 0;
+float sumX = 0;
+
+int32_t adcdCount = 0;
+int32_t adccCount = 0;
+int32_t adcbCount = 0;
 
 void main(void)
 {
@@ -229,6 +255,8 @@ void main(void)
 
 
     PieVectTable.ADCD1_INT = &ADCD_ISR;
+    PieVectTable.ADCC1_INT = &ADCC_ISR;
+    PieVectTable.ADCB1_INT = &ADCB_ISR;
 
     PieVectTable.EMIF_ERROR_INT = &SWI_isr;
     EDIS;    // This is needed to disable write to EALLOW protected registers
@@ -267,6 +295,20 @@ void main(void)
     EPwm4Regs.ETSEL.bit.SOCAEN = 1; //enable SOCA
     EPwm4Regs.TBCTL.bit.CTRMODE = 0; //unfreeze, and enter up count mode
     EDIS;
+    EALLOW;
+    EPwm7Regs.ETSEL.bit.SOCAEN = 0; // Disable SOC on A group
+    EPwm7Regs.TBCTL.bit.CTRMODE = 3; // freeze counter
+    EPwm7Regs.ETSEL.bit.SOCASEL = 2; // Select Event when counter equal to PRD
+    EPwm7Regs.ETPS.bit.SOCAPRD = 1; // Generate pulse on 1st event (“pulse” is the same as “trigger”)
+    EPwm7Regs.TBCTR = 0x0; // Clear counter
+    EPwm7Regs.TBPHS.bit.TBPHS = 0x0000; // Phase is 0
+    EPwm7Regs.TBCTL.bit.PHSEN = 0; // Disable phase loading
+    EPwm7Regs.TBCTL.bit.CLKDIV = 0; // divide by 1 50Mhz Clock
+    EPwm7Regs.TBPRD = 5000; // Set Period to 1ms sample. Input clock is 50MHz.
+    // Notice here that we are not setting CMPA or CMPB because we are not using the PWM signal
+    EPwm7Regs.ETSEL.bit.SOCAEN = 1; //enable SOCA
+    EPwm7Regs.TBCTL.bit.CTRMODE = 0; //unfreeze, and enter up count mode
+    EDIS;
 
     EALLOW;
     //write configurations for all ADCs ADCA, ADCB, ADCC, ADCD
@@ -302,32 +344,32 @@ void main(void)
     //    AdcaRegs.ADCINTSEL1N2.bit.INT1SEL = ???; //set to last SOC that is converted and it will set INT1 flag ADCA1
     //    AdcaRegs.ADCINTSEL1N2.bit.INT1E = 1; //enable INT1 flag
     //    AdcaRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
-    //    //ADCB Microphone is connected to ADCINB4
-    //    AdcbRegs.ADCSOC0CTL.bit.CHSEL = ???; //SOC0 will convert Channel you choose Does not have to be B0
-    //    AdcbRegs.ADCSOC0CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
-    //    AdcbRegs.ADCSOC0CTL.bit.TRIGSEL = ???;// EPWM7 ADCSOCA or another trigger you choose will trigger SOC0
-    //    AdcbRegs.ADCSOC1CTL.bit.CHSEL = ???; //SOC1 will convert Channel you choose Does not have to be B1
-    //    AdcbRegs.ADCSOC1CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
-    //    AdcbRegs.ADCSOC1CTL.bit.TRIGSEL = ???;// EPWM7 ADCSOCA or another trigger you choose will trigger SOC1
-    //    AdcbRegs.ADCINTSEL1N2.bit.INT1SEL = ???; //set to last SOC that is converted and it will set INT1 flag ADCB1
-    //    AdcbRegs.ADCINTSEL1N2.bit.INT1E = 1; //enable INT1 flag
-    //    AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
+    //ADCB Microphone is connected to ADCINB4
+    AdcbRegs.ADCSOC0CTL.bit.CHSEL = 4; //SOC0 will convert Channel you choose Does not have to be B0
+    AdcbRegs.ADCSOC0CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdcbRegs.ADCSOC0CTL.bit.TRIGSEL = 0x11;// EPWM7 ADCSOCA or another trigger you choose will trigger SOC0
+//    AdcbRegs.ADCSOC1CTL.bit.CHSEL = ???; //SOC1 will convert Channel you choose Does not have to be B1
+//    AdcbRegs.ADCSOC1CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+//    AdcbRegs.ADCSOC1CTL.bit.TRIGSEL = ???;// EPWM7 ADCSOCA or another trigger you choose will trigger SOC1
+    AdcbRegs.ADCINTSEL1N2.bit.INT1SEL = 0; //set to last SOC that is converted and it will set INT1 flag ADCB1
+    AdcbRegs.ADCINTSEL1N2.bit.INT1E = 1; //enable INT1 flag
+    AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
     //ADCC
-    //    AdccRegs.ADCSOC0CTL.bit.CHSEL = ???; //SOC0 will convert Channel you choose Does not have to be B0
-    //    AdccRegs.ADCSOC0CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
-    //    AdccRegs.ADCSOC0CTL.bit.TRIGSEL = ???; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC0
-    //    AdccRegs.ADCSOC1CTL.bit.CHSEL = ???; //SOC1 will convert Channel you choose Does not have to be B1
-    //    AdccRegs.ADCSOC1CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
-    //    AdccRegs.ADCSOC1CTL.bit.TRIGSEL = ???; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC1
-    //    AdccRegs.ADCSOC2CTL.bit.CHSEL = ???; //SOC2 will convert Channel you choose Does not have to be B2
-    //    AdccRegs.ADCSOC2CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
-    //    AdccRegs.ADCSOC2CTL.bit.TRIGSEL = ???; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC2
-    //    AdccRegs.ADCSOC3CTL.bit.CHSEL = ???; //SOC3 will convert Channel you choose Does not have to be B3
-    //    AdccRegs.ADCSOC3CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
-    //    AdccRegs.ADCSOC3CTL.bit.TRIGSEL = ???; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC3
-    //    AdccRegs.ADCINTSEL1N2.bit.INT1SEL = ???; //set to last SOC that is converted and it will set INT1 flag ADCB1
-    //    AdccRegs.ADCINTSEL1N2.bit.INT1E = 1; //enable INT1 flag
-    //    AdccRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
+    AdccRegs.ADCSOC0CTL.bit.CHSEL = 2; //SOC0 will convert Channel you choose Does not have to be B0
+    AdccRegs.ADCSOC0CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdccRegs.ADCSOC0CTL.bit.TRIGSEL = 0x0B; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC0
+    AdccRegs.ADCSOC1CTL.bit.CHSEL = 3; //SOC1 will convert Channel you choose Does not have to be B1
+    AdccRegs.ADCSOC1CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdccRegs.ADCSOC1CTL.bit.TRIGSEL = 0x0B; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC1
+    AdccRegs.ADCSOC2CTL.bit.CHSEL = 4; //SOC2 will convert Channel you choose Does not have to be B2
+    AdccRegs.ADCSOC2CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdccRegs.ADCSOC2CTL.bit.TRIGSEL = 0x0B; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC2
+    AdccRegs.ADCSOC3CTL.bit.CHSEL = 5; //SOC3 will convert Channel you choose Does not have to be B3
+    AdccRegs.ADCSOC3CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdccRegs.ADCSOC3CTL.bit.TRIGSEL = 0x0B; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC3
+    AdccRegs.ADCINTSEL1N2.bit.INT1SEL = 3; //set to last SOC that is converted and it will set INT1 flag ADCB1
+    AdccRegs.ADCINTSEL1N2.bit.INT1E = 1; //enable INT1 flag
+    AdccRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
     //ADCD
     AdcdRegs.ADCSOC0CTL.bit.CHSEL = 0; // set SOC0 to convert pin D0
     AdcdRegs.ADCSOC0CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
@@ -344,6 +386,7 @@ void main(void)
     AdcdRegs.ADCINTSEL1N2.bit.INT1SEL = 0x1; //set to SOC1, the last converted, and it will set INT1 flag ADCD1
     AdcdRegs.ADCINTSEL1N2.bit.INT1E = 1; //enable INT1 flag
     AdcdRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
+
     EDIS;
 
     // Enable DACA and DACB outputs
@@ -372,8 +415,14 @@ void main(void)
     PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
     // Enable TINT0 in the PIE: Group 1 interrupt 6
     PieCtrlRegs.PIEIER1.bit.INTx6 = 1;
+    // Enable TINT0 in the PIE: Group 1 interrupt 2
+    PieCtrlRegs.PIEIER1.bit.INTx2 = 1;
+    // Enable TINT0 in the PIE: Group 3 interrupt 7
+    PieCtrlRegs.PIEIER3.bit.INTx7 = 1;
     // Enable SWI in the PIE: Group 12 interrupt 9
     PieCtrlRegs.PIEIER12.bit.INTx9 = 1;
+    // Enable TINT0 in the PIE: Group 1 interrupt 3
+    PieCtrlRegs.PIEIER1.bit.INTx3 = 1;
 
     // Enable global Interrupts and higher priority real-time debug events
     EINT;  // Enable Global interrupt INTM
@@ -390,8 +439,8 @@ void main(void)
             //serial_printf(&SerialA,"Num Timer2:%ld Num SerialRX: %ld\r\n",CpuTimer2.InterruptCount,numRXA);
 
             //IMPORTANT!! %ld is for an int32_t.  To print an int16_t use %d
-            UART_printfLine(1,"adcd Calls %ld",adcdCount);
-            UART_printfLine(2,"V0 %f, V1 %f", xk, yk);
+            UART_printfLine(1,"x4 %.1f, z4 %.1f", x4, z4);
+            UART_printfLine(2," X %.1f, Z %.1f", X, Z);
             UARTPrint = 0;
         }
     }
@@ -453,10 +502,10 @@ __interrupt void cpu_timer2_isr(void)
     GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
 
     CpuTimer2.InterruptCount++;
-
-    if ((CpuTimer2.InterruptCount % 10) == 0) {
-        UARTPrint = 1;
-    }
+    //
+    //    if ((CpuTimer2.InterruptCount % 10) == 0) {
+    //        UARTPrint = 1;
+    //    }
 }
 
 ////adcd1 pie interrupt
@@ -483,46 +532,123 @@ __interrupt void cpu_timer2_isr(void)
 //}
 __interrupt void ADCD_ISR (void)
 {
+    adcdCount++;
     adcd0result = AdcdResultRegs.ADCRESULT0;
     adcd1result = AdcdResultRegs.ADCRESULT1;
     // Here covert ADCIND0, ADCIND1 to volts
     scaled0 = adcd0result * 3.0/4096.0;
     scaled1 = adcd1result * 3.0/4096.0;
     xks[0] = scaled0;
-//    yk = b[0]*xk + b[1]*xk_1 + b[2]*xk_2 + b[3]*xk_3 + b[4]*xk_4;
+    //    yk = b[0]*xk + b[1]*xk_1 + b[2]*xk_2 + b[3]*xk_3 + b[4]*xk_4;
 
     //Save past states before exiting from the function so that next sample they are the older state
-//    xk_4 = xk_3;
-//    xk_3 = xk_2;
-//    xk_2 = xk_1;
-//    xk_1 = xk;
+    //    xk_4 = xk_3;
+    //    xk_3 = xk_2;
+    //    xk_2 = xk_1;
+    //    xk_1 = xk;
 
     yk=0;
-    for(int16_t i = 0; i < n; i++){
+    for(int16_t i = 0; i < nSIZE; i++){
         yk += b[i] * xks[i];
     }
-    for(int16_t i = n-1; i > 0; i--){
+    for(int16_t i = nSIZE-1; i > 0; i--){
         xks[i] = xks[i-1];
     }
 
     // Here write yk to DACA channel
-    setDACA(yk);
+//    setDACA(yk);
 
 
     // Print xk and yk’s voltage value to LCD every 100ms
-    if ((adcdCount % 100) == 0) {
-        UARTPrint = 1;
-    }
+    //    if ((adcdCount % 100) == 0) {
+    //        UARTPrint = 1;
+    //    }
+
     AdcdRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //clear interrupt flag
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
 
+__interrupt void ADCC_ISR (void) {
 
+    adcc0result = AdccResultRegs.ADCRESULT0;
+    adcc1result = AdccResultRegs.ADCRESULT1;
+    adcc2result = AdccResultRegs.ADCRESULT2;
+    adcc3result = AdccResultRegs.ADCRESULT3;
+
+    scaledc0 = adcc0result * 3.0/4096.0;
+    scaledc1 = adcc1result * 3.0/4096.0;
+    scaledc2 = adcc2result * 3.0/4096.0;
+    scaledc3 = adcc3result * 3.0/4096.0;
+
+//    z4 = (scaledc2 - 1.23) * 100;
+//    x4 = (scaledc1 - 1.23) * 100;
+//    Z = (scaledc3 - 1.23) * 400;
+//    X = (scaledc0 - 1.23) * 400;
+    // Print xk and yk’s voltage value to LCD every 100ms
+    //    if ((adccCount % 250) == 0) {
+    //        UARTPrint = 1;
+    //    }
+
+    if ((adccCount <= 1000)) {
+
+    } else if(adccCount < 3000){
+        sum4Z += scaledc2;
+        sum4X += scaledc1;
+        sumZ += scaledc3;
+        sumX += scaledc0;
+    } else if ((adccCount == 3000)) {
+        sum4Z /= 2000;
+        sum4X /= 2000;
+        sumZ /= 2000;
+        sumX /= 2000;
+
+    } else {
+        scaledc2 -= sum4Z;
+        scaledc1 -= sum4X;
+        scaledc0 -= sumX;
+        scaledc3 -= sumZ;
+
+    }
+    z4 = (scaledc2 ) * 100;
+    x4 = (scaledc1) * 100;
+    Z = (scaledc3 ) * 400;
+    X = (scaledc0 ) * 400;
+
+    if ((adccCount % 200) == 0) {
+        UARTPrint = 1;
+    }
+
+
+    adccCount++;
+    AdccRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //clear interrupt flag
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+}
+
+__interrupt void ADCB_ISR (void)
+{
+    adcbCount++;
+    adcbresult = AdcbResultRegs.ADCRESULT0;
+
+    scaledb = adcbresult * 3.0/4096.0;
+
+    setDACA(scaledb);
+
+    if ((adcbCount % 2500) == 0) {
+        UARTPrint = 1;
+    }
+
+
+    AdcbRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //clear interrupt flag
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+}
 //This function sets DACA to the voltage between 0V and 3V passed to this function.
 //If outside 0V to 3V the output is saturated at 0V to 3V
 //Example code
 //float myu = 2.25;
 //setDACA(myu); // DACA will now output 2.25 Volts
+
+
+
 void setDACA(float dacouta0) {
     int16_t DACOutInt = 0;
     DACOutInt = dacouta0 * 4096.0/3.0; // perform scaling of 0 – almost 3.0V to 0 – 4095
