@@ -39,35 +39,86 @@ float readEncLeft(void);
 float readEncRight(void);
 float readEncWheel(void);
 
+__interrupt void ADCC_ISR (void);
+
 // Count variables
 uint32_t numTimer0calls = 0;
 uint32_t numSWIcalls = 0;
 extern uint32_t numRXA;
 uint16_t UARTPrint = 0;
 
-int16_t updown = 1;
-float updawg = 0;
-int16_t updawG_flag = 0;
-float LeftWheel;
-float RightWheel;
+int16_t adcc0result = 0;
+int16_t adcc1result = 0;
+int16_t adcc2result = 0;
+int16_t adcc3result = 0;
+
+float scaledc0 = 0;
+float scaledc1 = 0;
+float scaledc2 = 0;
+float scaledc3 = 0;
+
+float z4 = 0.0;
+float x4 = 0.0;
+float Z = 0.0;
+float X = 0.0;
+
+float sum4Z = 0.0;
+float sum4X = 0.0;
+float sumZ = 0.0;
+float sumX = 0.0;
+
+int32_t adccCount = 0;
+
+
+float LeftWheel = 0;
+float RightWheel = 0;
 float left_feet = 0;
 float right_feet = 0;
-float uLeft;
-float uRight;
+float uLeft = 0;
+float uRight= 0;
+float enc = 0;
 float p_old1 = 0;
-float p_current1;
+float p_current1= 0;
 float p_old2 = 0;
-float p_current2;
-float v1;
-float v2;
+float p_current2= 0;
+float v1= 0;
+float v2= 0;
 float Vpos = 2.3;
 float Vneg = 2.2;
 float Cpos = 2.116;
 float Cneg = -2.116;
 
+float Vref = 1.0;
+float turn = 0.0;
+float Ki = 15.0;
+float Kp = 3.0;
+float Kp_turn = 3.0;
+
+float errKLeft = 0;
+float IKLeft = 0;
+float IKLeft_old = 0;
+float errLeft = 0;
+float errLeft_old = 0;
+
+float errKRight = 0;
+float IKRight = 0;
+float IKRight_old = 0;
+float errRight = 0;
+float errRight_old = 0;
+
+float int4Z = 0.0;
+float intZ = 0.0;
+
+float int4Z_old = 0.0;
+float intZ_old = 0.0;
+
+float z4_old = 0.0;
+float Z_old = 0.0;
+
+float errSteer = 0.0;
+
 void main(void)
 {
-
     // PLL, WatchDog, enable Peripheral Clocks
     // This example function is found in the F2837xD_SysCtrl.c file.
     InitSysCtrl();
@@ -178,6 +229,7 @@ void main(void)
     GPIO_SetupPinMux(2, GPIO_MUX_CPU1, 1);
     GPIO_SetupPinOptions(2, GPIO_OUTPUT, GPIO_PUSHPULL);
     GpioDataRegs.GPASET.bit.GPIO2 = 1;
+
     // Clear all interrupts and initialize PIE vector table:
     // Disable CPU interrupts
     DINT;
@@ -215,8 +267,11 @@ void main(void)
     PieVectTable.SCIC_TX_INT = &TXCINT_data_sent;
     PieVectTable.SCID_TX_INT = &TXDINT_data_sent;
 
+    PieVectTable.ADCC1_INT = &ADCC_ISR;
+
     PieVectTable.EMIF_ERROR_INT = &SWI_isr;
     EDIS;    // This is needed to disable write to EALLOW protected registers
+
 
 
     // Initialize the CpuTimers Device Peripheral. This function can be
@@ -238,28 +293,12 @@ void main(void)
     init_serialSCIB(&SerialB,19200);
     //    init_serialSCIC(&SerialC,115200);
     //    init_serialSCID(&SerialD,115200);
-    init_eQEPs();
-
-
-    //SMWD PWM12
-    EPwm12Regs.TBCTL.bit.CTRMODE = 0;   //SMWD Count mode
-    EPwm12Regs.TBCTL.bit.FREE_SOFT= 2;  //SMWD Free Soft mode to Free run
-    EPwm12Regs.TBCTL.bit.CLKDIV= 0;      //SMWD set clock divide 1
-    EPwm12Regs.TBCTL.bit.PHSEN = 0;      //SMWD disable Phase loading
-
-    EPwm12Regs.TBCTR = 0;                //SMWD set timer to 0
-    EPwm12Regs.TBPRD = 2500;             //SMWD Carrier Frequency
-    EPwm12Regs.CMPA.bit.CMPA = 1250;      //SMWD duty Cycle 50%
-    EPwm12Regs.AQCTLA.bit.CAU=1;         //SMWD PWM clear signla
-    EPwm12Regs.AQCTLA.bit.ZRO = 2;       //SMWD Have pin be set wen register is zro
-    EPwm12Regs.TBPHS.bit.TBPHS = 0;      //SMWD ignore phase
 
     EALLOW;                                  //SMWD Below are protected registers
     GpioCtrlRegs.GPAPUD.bit.GPIO0 = 1;     //SMWD For EPWM1A
     GpioCtrlRegs.GPAPUD.bit.GPIO2 = 1;      //SMWD For EPWMA2
-    GpioCtrlRegs.GPAPUD.bit.GPIO22 = 1;     //SMWD For EPWM12A
-    EDIS;                                  //SMWB close edit block
-
+    EDIS;
+    EALLOW;
     //SMWD PWM2
     EPwm2Regs.TBCTL.bit.CTRMODE = 0;   //SMWD Count mode
     EPwm2Regs.TBCTL.bit.FREE_SOFT= 2;  //SMWD Free Soft mode to Free run
@@ -285,12 +324,47 @@ void main(void)
     EPwm1Regs.AQCTLA.bit.CAU=1;         //SMWD PWM clear signla
     EPwm1Regs.AQCTLA.bit.ZRO = 2;       //SMWD Have pin be set wen register is zro
     EPwm1Regs.TBPHS.bit.TBPHS = 0;      //SMWD ignore phase
-    //    EALLOW;                                  //SMWD Below are protected registers
-    //    GpioCtrlRegs.GPAPUD.bit.GPIO0 = 1;     //SMWD For EPWM1A
-    //    GpioCtrlRegs.GPAPUD.bit.GPIO2 = 1;      //SMWD For EPWMA2
-    //    GpioCtrlRegs.GPAPUD.bit.GPIO22 = 1;     //SMWD For EPWM12A
-    //    EDIS;                                  //SMWB close edit block
 
+
+
+    EPwm4Regs.ETSEL.bit.SOCAEN = 0; // Disable SOC on A group
+    EPwm4Regs.TBCTL.bit.CTRMODE = 3; // freeze counter
+    EPwm4Regs.ETSEL.bit.SOCASEL = 2; // Select Event when counter equal to PRD
+    EPwm4Regs.ETPS.bit.SOCAPRD = 1; // Generate pulse on 1st event (“pulse” is the same as “trigger”)
+    EPwm4Regs.TBCTR = 0x0; // Clear counter
+    EPwm4Regs.TBPHS.bit.TBPHS = 0x0000; // Phase is 0
+    EPwm4Regs.TBCTL.bit.PHSEN = 0; // Disable phase loading
+    EPwm4Regs.TBCTL.bit.CLKDIV = 0; // divide by 1 50Mhz Clock
+    EPwm4Regs.TBPRD = 50000; // Set Period to 1ms sample. Input clock is 50MHz.
+    // Notice here that we are not setting CMPA or CMPB because we are not using the PWM signal
+    EPwm4Regs.ETSEL.bit.SOCAEN = 1; //enable SOCA
+    EPwm4Regs.TBCTL.bit.CTRMODE = 0; //unfreeze, and enter up count mode
+    EDIS;
+
+    EALLOW;
+    AdccRegs.ADCCTL2.bit.PRESCALE = 6; //set ADCCLK divider to /4
+    AdcSetMode(ADC_ADCC, ADC_RESOLUTION_12BIT, ADC_SIGNALMODE_SINGLE); //read calibration settings
+    AdccRegs.ADCCTL1.bit.INTPULSEPOS = 1;
+    AdccRegs.ADCCTL1.bit.ADCPWDNZ = 1;
+    //ADCC
+    AdccRegs.ADCSOC0CTL.bit.CHSEL = 2; //SOC0 will convert Channel you choose Does not have to be B0
+    AdccRegs.ADCSOC0CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdccRegs.ADCSOC0CTL.bit.TRIGSEL = 0x0B; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC0
+    AdccRegs.ADCSOC1CTL.bit.CHSEL = 3; //SOC1 will convert Channel you choose Does not have to be B1
+    AdccRegs.ADCSOC1CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdccRegs.ADCSOC1CTL.bit.TRIGSEL = 0x0B; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC1
+    AdccRegs.ADCSOC2CTL.bit.CHSEL = 4; //SOC2 will convert Channel you choose Does not have to be B2
+    AdccRegs.ADCSOC2CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdccRegs.ADCSOC2CTL.bit.TRIGSEL = 0x0B; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC2
+    AdccRegs.ADCSOC3CTL.bit.CHSEL = 5; //SOC3 will convert Channel you choose Does not have to be B3
+    AdccRegs.ADCSOC3CTL.bit.ACQPS = 99; //sample window is acqps + 1 SYSCLK cycles = 500ns
+    AdccRegs.ADCSOC3CTL.bit.TRIGSEL = 0x0B; // EPWM4 ADCSOCA or another trigger you choose will trigger SOC3
+    AdccRegs.ADCINTSEL1N2.bit.INT1SEL = 3; //set to last SOC that is converted and it will set INT1 flag ADCB1
+    AdccRegs.ADCINTSEL1N2.bit.INT1E = 1; //enable INT1 flag
+    AdccRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //make sure INT1 flag is cleared
+
+    EDIS;
+    init_eQEPs();
     // Enable CPU int1 which is connected to CPU-Timer 0, CPU int13
     // which is connected to CPU-Timer 1, and CPU int 14, which is connected
     // to CPU-Timer 2:  int 12 is for the SWI.  
@@ -305,6 +379,8 @@ void main(void)
     PieCtrlRegs.PIEIER1.bit.INTx7 = 1;
     // Enable SWI in the PIE: Group 12 interrupt 9
     PieCtrlRegs.PIEIER12.bit.INTx9 = 1;
+    // Enable TINT0 in the PIE: Group 1 interrupt 3
+    PieCtrlRegs.PIEIER1.bit.INTx3 = 1;
 
     // Enable global Interrupts and higher priority real-time debug events
     EINT;  // Enable Global interrupt INTM
@@ -314,7 +390,6 @@ void main(void)
     // IDLE loop. Just sit and loop forever (optional):
     while(1)
     {
-
         if (UARTPrint == 1 ) {
             // Normally on the Robot Car we only use the below UART_printfLine functions to write to the
             // on board LCD screen.  This below serial_printf is only used in lab 1 to print to a serial
@@ -322,11 +397,14 @@ void main(void)
             //serial_printf(&SerialA,"Num Timer2:%ld Num SerialRX: %ld\r\n",CpuTimer2.InterruptCount,numRXA);
 
             //IMPORTANT!! %ld is for an int32_t.  To print an int16_t use %d
-            UART_printfLine(1,"v1 %.2f,v2 %.2f",v1, v2);
-            UART_printfLine(2,", wheel %f",readEncWheel());
+//            UART_printfLine(1,"x4 %.1f, z4 %.1f", x4, z4);
+//            UART_printfLine(2," X %.1f, Z %.1f", X, Z);
+//            UART_printfLine(1,"x4 %.1f, z4 %.1f", x4, z4);
+            UART_printfLine(2," 4Z %.2f, Z %.2f", int4Z, intZ);
+//            UART_printfLine(1,"v1 %.2f,v2 %.2f",v1, v2);
+//            UART_printfLine(2,"Vref %.2f,turn %.2f ",Vref, turn);
             UARTPrint = 0;
         }
-
     }
 }
 
@@ -355,13 +433,8 @@ __interrupt void SWI_isr(void) {
 __interrupt void cpu_timer0_isr(void)
 {
     CpuTimer0.InterruptCount++;
-    LeftWheel = readEncLeft();
-    RightWheel = readEncRight();
-    left_feet  = LeftWheel / 9.95;
-    right_feet = RightWheel / 9.95;
 
     numTimer0calls++;
-
 
     //    if ((numTimer0calls%50) == 0) {
     //        PieCtrlRegs.PIEIFR12.bit.INTx9 = 1;  // Manually cause the interrupt for the SWI
@@ -391,61 +464,129 @@ __interrupt void cpu_timer2_isr(void)
     GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
 
     CpuTimer2.InterruptCount++;
-//    uLeft = readEncWheel();
-//    uRight = readEncWheel();
-    uLeft = 0;
-    uRight = 0;
-    p_current1 = left_feet;
-    p_current2 = right_feet;
-    v1 = (p_current1-p_old1) / 0.001;
-    v2 = (p_current2-p_old2) / 0.001;
-    if (v1 > 0.0) {
-        uLeft = uLeft + Vpos * v1 + Cpos;
-    } else {
-        uLeft = uLeft + Vneg * v1 + Cneg;
-    }
-    if (v2 > 0.0) {
-        uRight = uRight + Vpos * v2 + Cpos;
-    } else {
-        uRight = uRight + Vneg * v2  + Cneg;
-    }
-    setEPWM1A(uLeft);
-    setEPWM2A(-uRight);
+
+//    if ((CpuTimer2.InterruptCount % 10) == 0) {
+//        UARTPrint = 1;
+//    }
+}
+__interrupt void ADCC_ISR (void) {
+
+    LeftWheel = readEncLeft();
+    RightWheel = readEncRight();
+    left_feet  = LeftWheel / 9.95;
+    right_feet = RightWheel / 9.95;
 
 
-    if ((CpuTimer2.InterruptCount % 100) == 0) {
+    adcc0result = AdccResultRegs.ADCRESULT0;
+    adcc1result = AdccResultRegs.ADCRESULT1;
+    adcc2result = AdccResultRegs.ADCRESULT2;
+    adcc3result = AdccResultRegs.ADCRESULT3;
+
+    scaledc0 = adcc0result * 3.0/4096.0;
+    scaledc1 = adcc1result * 3.0/4096.0;
+    scaledc2 = adcc2result * 3.0/4096.0;
+    scaledc3 = adcc3result * 3.0/4096.0;
+
+    //    z4 = (scaledc2 - 1.23) * 100;
+    //    x4 = (scaledc1 - 1.23) * 100;
+    //    Z = (scaledc3 - 1.23) * 400;
+    //    X = (scaledc0 - 1.23) * 400;
+    // Print xk and yk’s voltage value to LCD every 100ms
+    //    if ((adccCount % 250) == 0) {
+    //        UARTPrint = 1;
+    //    }
+
+    if ((adccCount < 2000)) {
+
+    } else if(adccCount < 4000){
+        sum4Z += scaledc2;
+        sum4X += scaledc1;
+        sumZ += scaledc3;
+        sumX += scaledc0;
+    } else if ((adccCount == 4000)) {
+        sum4Z /= 2000;
+        sum4X /= 2000;
+        sumZ /= 2000;
+        sumX /= 2000;
+
+    } else {
+        scaledc2 -= sum4Z;
+        scaledc1 -= sum4X;
+        scaledc0 -= sumX;
+        scaledc3 -= sumZ;
+        z4 = (scaledc2 ) * 100;
+        x4 = (scaledc1) * 100;
+        Z = (scaledc3 ) * 400;
+        X = (scaledc0 ) * 400;
+
+//        uLeft = readEncWheel();
+//        uRight = readEncWheel();
+        turn = readEncWheel()/4;
+
+        p_current1 = left_feet;
+        p_current2 = right_feet;
+        v1 = (p_current1-p_old1) / 0.001;
+        v2 = (p_current2-p_old2) / 0.001;
+        errSteer = Kp_turn * (v2 - v1 + turn);
+        errLeft =  Vref - v1 + errSteer;
+        errRight =  Vref - v2 - errSteer;
+        IKLeft = IKLeft_old + ((errLeft + errLeft_old)*0.5) * 0.001;
+        IKRight = IKRight_old + ((errRight + errRight_old)*0.5) * 0.001;
+        uLeft = Kp*errKLeft + Ki*IKLeft;
+        uRight = Kp*errKRight + Ki*IKRight;
+
+        int4Z = int4Z_old + ((z4 + z4_old)*0.5)* 0.001;
+        intZ = intZ_old + ((Z + Z_old)*0.5)* 0.001;
+
+        if (v1 > 0.0) {
+            uLeft = uLeft +0.6 * Vpos * v1 + 0.6* Cpos;
+        } else {
+            uLeft = uLeft + 0.6* Vneg * v1 + 0.6*Cneg;
+        }
+        if (v2 > 0.0) {
+            uRight = uRight + 0.6* Vpos * v2 + 0.6*Cpos;
+        } else {
+            uRight = uRight + 0.6*Vneg * v2  + 0.6*Cneg;
+        }
+
+        if (fabs(uLeft) > 10){
+            IKLeft = IKLeft_old*.99;
+        }
+        if (fabs(uRight) > 10){
+            IKRight = IKRight_old*.99;
+        }
+
+
+        setEPWM1A(uLeft);
+        setEPWM2A(-uRight);
+
+        errLeft_old = errLeft;
+        errRight_old = errRight;
+
+        IKLeft_old = IKLeft;
+        IKRight_old = IKRight;
+
+        p_old1 = p_current1;
+        p_old2 = p_current2;
+
+        z4_old = z4;
+        Z_old = Z;
+
+        int4Z_old = int4Z;
+        intZ_old = intZ;
+    }
+
+
+    if ((adccCount % 200) == 0) {
         UARTPrint = 1;
     }
 
-    //    if (updown == 1) {
-    //        if(EPwm1Regs.CMPA.bit.CMPA == EPwm12Regs.TBPRD ){
-    //            updown = 0; //SMWD updawg
-    //        }
-    //
-    //    } else {
-    //        if(EPwm1Regs.CMPA.bit.CMPA ==  0){
-    //            updown = 1; //SMWD updawg
-    //        }
-    //
-    //    }
-    if(updawG_flag == 1){
-        updawg += 0.005;
-        if (updawg >= 10){
-            updawG_flag = 0;
-        }
-    } else {
-        updawg -= 0.005;
-        if (updawg <= -10){
-            updawG_flag = 1;
-        }
-    }
-    p_old1 = p_current1;
-    p_old2 = p_current2;
 
-//    setEPWM1A(updawg);
-//    setEPWM2A(updawg);
-
+    adccCount++;
+    AdccRegs.ADCINTFLGCLR.bit.ADCINT1 = 1; //clear interrupt flag
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
 }
+
 void setEPWM1A(float controleffort){
     if(controleffort <= -10) {
         controleffort = -10;
