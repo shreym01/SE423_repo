@@ -18,6 +18,8 @@
 #include "song.h"
 #include "dsp.h"
 #include "fpu32/fpu_rfft.h"
+#include "F2837xD_SWPrioritizedIsrLevels.h"
+#define FEETINONEMETER 3.28083989501312
 
 #define PI          3.1415926535897932384626433832795
 #define TWOPI       6.283185307179586476925286766559
@@ -30,7 +32,11 @@
 __interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
 __interrupt void cpu_timer2_isr(void);
-__interrupt void SWI_isr(void);
+
+
+__interrupt void SWI1_HighestPriority(void);
+__interrupt void SWI2_MiddlePriority(void);
+__interrupt void SWI3_LowestPriority(void);
 
 void setEPWM1A(float controleffort);
 void setEPWM2A(float controleffort);
@@ -44,6 +50,42 @@ __interrupt void ADCC_ISR (void);
 //SM ADDED
 __interrupt void SPIB_isr(void);
 void setupSpib(void);
+
+void PostSWI1(void);
+void PostSWI3(void);
+
+uint32_t timecount = 0;
+
+extern datapts ladar_data[228]; //distance data from LADAR
+
+extern float printLV1;
+extern float printLV2;
+
+extern float LADARrightfront;
+extern float LADARfront;
+
+extern LVSendFloats_t DataToLabView;
+extern char LVsenddata[LVNUM_TOFROM_FLOATS*4+2];
+extern float fromLVvalues[LVNUM_TOFROM_FLOATS];
+extern char G_command[]; //command for getting distance -120 to 120 degree
+extern uint16_t G_len; //length of command
+extern xy ladar_pts[228]; //xy data
+
+extern uint16_t LADARpingpong;
+extern float LADARxoffset;
+extern float LADARyoffset;
+
+extern uint16_t newLinuxCommands;
+extern float LinuxCommands[CMDNUM_FROM_FLOATS];
+
+extern uint16_t NewLVData;
+
+uint16_t LADARi = 0;
+pose ROBOTps = {0,0,0}; //robot position
+pose LADARps = {3.5/12.0,0,1};  // 3.5/12 for front mounting, theta is not used in this current code
+float printLinux1 = 0;
+float printLinux2 = 0;
+
 
 // Count variables
 uint32_t numTimer0calls = 0;
@@ -259,6 +301,10 @@ void main(void)
     GPIO_SetupPinOptions(2, GPIO_OUTPUT, GPIO_PUSHPULL);
     GpioDataRegs.GPASET.bit.GPIO2 = 1;
 
+    GPIO_SetupPinMux(61, GPIO_MUX_CPU1, 0);
+    GPIO_SetupPinOptions(61, GPIO_OUTPUT, GPIO_PUSHPULL);
+    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;
+
     // Clear all interrupts and initialize PIE vector table:
     // Disable CPU interrupts
     DINT;
@@ -298,7 +344,12 @@ void main(void)
 
     PieVectTable.ADCC1_INT = &ADCC_ISR;
 
-    PieVectTable.EMIF_ERROR_INT = &SWI_isr;
+//    PieVectTable.EMIF_ERROR_INT = &SWI_isr;
+
+    PieVectTable.EMIF_ERROR_INT = &SWI1_HighestPriority;
+    PieVectTable.RAM_CORRECTABLE_ERROR_INT = &SWI2_MiddlePriority;
+    PieVectTable.FLASH_CORRECTABLE_ERROR_INT = &SWI3_LowestPriority;
+
     PieVectTable.SPIB_RX_INT = &SPIB_isr; //SM ADDED
     EDIS;    // This is needed to disable write to EALLOW protected registers
 
@@ -310,7 +361,7 @@ void main(void)
 
     // Configure CPU-Timer 0, 1, and 2 to interrupt every given period:
     // 200MHz CPU Freq,                       Period (in uSeconds)
-    ConfigCpuTimer(&CpuTimer0, LAUNCHPAD_CPU_FREQUENCY, 1000);
+    ConfigCpuTimer(&CpuTimer0, LAUNCHPAD_CPU_FREQUENCY, 100000);
     ConfigCpuTimer(&CpuTimer1, LAUNCHPAD_CPU_FREQUENCY, 20000);
     ConfigCpuTimer(&CpuTimer2, LAUNCHPAD_CPU_FREQUENCY, 1000);
 
@@ -319,10 +370,16 @@ void main(void)
     CpuTimer1Regs.TCR.all = 0x4000;
     CpuTimer2Regs.TCR.all = 0x4000;
 
+    DELAY_US(1000000);  // Delay 1 second giving LADAR Time to power on after system power on
+
     init_serialSCIA(&SerialA,115200);
     init_serialSCIB(&SerialB,19200);
-    //    init_serialSCIC(&SerialC,115200);
-    //    init_serialSCID(&SerialD,115200);
+    init_serialSCIC(&SerialC,19200);
+    init_serialSCID(&SerialD,2083332);
+
+    for (LADARi = 0; LADARi < 228; LADARi++) {
+        ladar_data[LADARi].angle = ((3*LADARi+44)*0.3515625-135)*0.01745329; //0.017453292519943 is pi/180, multiplication is faster; 0.3515625 is 360/1024
+    }
 
     EALLOW;                                  //SMWD Below are protected registers
     GpioCtrlRegs.GPAPUD.bit.GPIO0 = 1;     //SMWD For EPWM1A
@@ -417,12 +474,21 @@ void main(void)
     PieCtrlRegs.PIEIER1.bit.INTx3 = 1;
     //SM group 1 interrupt 3
     PieCtrlRegs.PIEIER6.bit.INTx3 = 1;
+    //    PieCtrlRegs.PIEIER12.bit.INTx9 = 1; //SWI1
+    PieCtrlRegs.PIEIER12.bit.INTx10 = 1; //SWI2
+    PieCtrlRegs.PIEIER12.bit.INTx11 = 1; //SWI3  Lowest priority
 
     // Enable global Interrupts and higher priority real-time debug events
     EINT;  // Enable Global interrupt INTM
     ERTM;  // Enable Global realtime interrupt DBGM
 
+    char S_command[19] = "S1152000124000\n";//this change the baud rate to 115200
+    uint16_t S_len = 19;
+    serial_sendSCIC(&SerialC, S_command, S_len);
 
+
+    DELAY_US(1000000);  // Delay letting LADAR change its Baud rate
+    init_serialSCIC(&SerialC,115200);
     // IDLE loop. Just sit and loop forever (optional):
     while(1)
     {
@@ -445,98 +511,30 @@ void main(void)
     }
 }
 
-
-// SWI_isr,  Using this interrupt as a Software started interrupt
-__interrupt void SWI_isr(void) {
-
-    // These three lines of code allow SWI_isr, to be interrupted by other interrupt functions
-    // making it lower priority than all other Hardware interrupts.
-    PieCtrlRegs.PIEACK.all = PIEACK_GROUP12;
-    asm("       NOP");                    // Wait one cycle
-    EINT;                                 // Clear INTM to enable interrupts
-
-
-
-    // Insert SWI ISR Code here.......
-
-
-    numSWIcalls++;
-
-    DINT;
-
-}
-
-// cpu_timer0_isr - CPU Timer0 ISR
-__interrupt void cpu_timer0_isr(void)
+//
+// Connected to PIEIER12_9 (use MINT12 and MG12_9 masks):
+//
+__interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 {
-    CpuTimer0.InterruptCount++;
+    GpioDataRegs.GPBSET.bit.GPIO61 = 1;
+    // Set interrupt priority:
+    volatile Uint16 TempPIEIER = PieCtrlRegs.PIEIER12.all;
+    IER |= M_INT12;
+    IER    &= MINT12;                          // Set "global" priority
+    PieCtrlRegs.PIEIER12.all &= MG12_9;  // Set "group"  priority
+    PieCtrlRegs.PIEACK.all = 0xFFFF;    // Enable PIE interrupts
+    __asm("  NOP");
+    EINT;
 
-    numTimer0calls++;
-
-    //    if ((numTimer0calls%50) == 0) {
-    //        PieCtrlRegs.PIEIFR12.bit.INTx9 = 1;  // Manually cause the interrupt for the SWI
-    //    }
-
-    if ((numTimer0calls%5) == 0) {
-        // Blink LaunchPad Red LED
-        GpioDataRegs.GPBTOGGLE.bit.GPIO34 = 1;
-    }
-
-
-    // Acknowledge this interrupt to receive more interrupts from group 1
-    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
-}
-
-// cpu_timer1_isr - CPU Timer1 ISR
-__interrupt void cpu_timer1_isr(void)
-{
-
-    CpuTimer1.InterruptCount++;
-}
-
-// cpu_timer2_isr CPU Timer2 ISR
-__interrupt void cpu_timer2_isr(void)
-{
-    // Blink LaunchPad Blue LED
-    GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
-
-    CpuTimer2.InterruptCount++;
-
-    //    if ((CpuTimer2.InterruptCount % 10) == 0) {
-    //        UARTPrint = 1;
-    //    }
-}
-//SM Added
-__interrupt void SPIB_isr(void){
-    //SE423 E3
-    //    spivalue1 = SpibRegs.SPIRXBUF; //SM Read first 16 bit value off RX FIFO. Probably is zero since no chip
-    //    spivalue2 = SpibRegs.SPIRXBUF; //SM Read second 16 bit value off RX FIFO. Again probably zero
-    GpioDataRegs.GPCSET.bit.GPIO66 = 1; //SM Set GPIO 66 high to end Slave Select. Now to Scope. Later to deselect MPU9250.  
-    spivalue1 = SpibRegs.SPIRXBUF;
-    spivalue2 = SpibRegs.SPIRXBUF;
-    spivalue3 = SpibRegs.SPIRXBUF;
-    spivalue4 = SpibRegs.SPIRXBUF;
-    spivalue5 = SpibRegs.SPIRXBUF;
-    spivalue6 = SpibRegs.SPIRXBUF;
-    spivalue7 = SpibRegs.SPIRXBUF;
-    spivalue8 = SpibRegs.SPIRXBUF;
-
-    accelx = (spivalue2/32767.0)*4.0;
-    accely = (spivalue3/32767.0)*4.0;
-    accelz = (spivalue4/32767.0)*4.0;
-    //        temp = 0;
-    gyrox = (spivalue6/32767.0)*250.0;
-    gyroy = (spivalue7/32767.0)*250.0;
-    gyroz = (spivalue8/32767.0)*250.0;
-
-    if ((spibCount < 2000)) {
-    } else if(spibCount < 4000){
+    uint16_t i = 0;//for loop
+    if ((timecount < 2000)) {
+    } else if(timecount < 4000){
         sum4Z += scaledc2;
         sum4X += scaledc1;
         sumZ += scaledc3;
         sumX += scaledc0;
         sumgZ += gyroz;
-    } else if ((spibCount == 4000)) {
+    } else if ((timecount == 4000)) {
         sum4Z /= 2000;
         sum4X /= 2000;
         sumZ /= 2000;
@@ -613,6 +611,233 @@ __interrupt void SPIB_isr(void){
 
     }
 
+    if (newLinuxCommands == 1) {
+        newLinuxCommands = 0;
+        printLinux1 = LinuxCommands[0];
+        printLinux2 = LinuxCommands[1];
+        //value3 = LinuxCommands[2];
+        //value4 = LinuxCommands[3];
+        //value5 = LinuxCommands[4];
+        //value6 = LinuxCommands[5];
+        //value7 = LinuxCommands[6];
+        //value8 = LinuxCommands[7];
+        //value9 = LinuxCommands[8];
+        //value10 = LinuxCommands[9];
+        //value11 = LinuxCommands[10];
+    }
+
+
+    if (NewLVData == 1) {
+        NewLVData = 0;
+        printLV1 = fromLVvalues[0];
+        printLV2 = fromLVvalues[1];
+    }
+
+    if((timecount%250) == 0) {
+        DataToLabView.floatData[0] = ROBOTps.x;
+        DataToLabView.floatData[1] = ROBOTps.y;
+        DataToLabView.floatData[2] = (float)timecount;
+        DataToLabView.floatData[3] = ROBOTps.theta;
+        DataToLabView.floatData[4] = ROBOTps.theta;
+        DataToLabView.floatData[5] = ROBOTps.theta;
+        DataToLabView.floatData[6] = ROBOTps.theta;
+        DataToLabView.floatData[7] = ROBOTps.theta;
+        LVsenddata[0] = '*';  // header for LVdata
+        LVsenddata[1] = '$';
+        for (i=0;i<LVNUM_TOFROM_FLOATS*4;i++) {
+            if (i%2==0) {
+                LVsenddata[i+2] = DataToLabView.rawData[i/2] & 0xFF;
+            } else {
+                LVsenddata[i+2] = (DataToLabView.rawData[i/2]>>8) & 0xFF;
+            }
+        }
+        serial_sendSCID(&SerialD, LVsenddata, 4*LVNUM_TOFROM_FLOATS + 2);
+    }
+
+
+
+    timecount++;
+
+
+    GpioDataRegs.GPBCLEAR.bit.GPIO61 = 1;
+    //##############################################################################################################
+    //
+    // Restore registers saved:
+    //
+    DINT;
+    PieCtrlRegs.PIEIER12.all = TempPIEIER;
+
+}
+
+//
+// Connected to PIEIER12_10 (use MINT12 and MG12_10 masks):
+//
+__interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
+{
+    // Set interrupt priority:
+    volatile Uint16 TempPIEIER = PieCtrlRegs.PIEIER12.all;
+    IER |= M_INT12;
+    IER    &= MINT12;                          // Set "global" priority
+    PieCtrlRegs.PIEIER12.all &= MG12_10;  // Set "group"  priority
+    PieCtrlRegs.PIEACK.all = 0xFFFF;    // Enable PIE interrupts
+    __asm("  NOP");
+    EINT;
+
+    //###############################################################################################
+    // Insert SWI ISR Code here.......
+
+    if (LADARpingpong == 1) {
+        // LADARrightfront is the min of dist 52, 53, 54, 55, 56
+        LADARrightfront = 19; // 19 is greater than max feet
+        for (LADARi = 52; LADARi <= 56 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARrightfront) {
+                LADARrightfront = ladar_data[LADARi].distance_ping;
+            }
+        }
+        // LADARfront is the min of dist 111, 112, 113, 114, 115
+        LADARfront = 19;
+        for (LADARi = 111; LADARi <= 115 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARfront) {
+                LADARfront = ladar_data[LADARi].distance_ping;
+            }
+        }
+        LADARxoffset = ROBOTps.x + (LADARps.x*cosf(ROBOTps.theta)-LADARps.y*sinf(ROBOTps.theta - PI/2.0));
+        LADARyoffset = ROBOTps.y + (LADARps.x*sinf(ROBOTps.theta)-LADARps.y*cosf(ROBOTps.theta - PI/2.0));
+        for (LADARi = 0; LADARi < 228; LADARi++) {
+
+            ladar_pts[LADARi].x = LADARxoffset + ladar_data[LADARi].distance_ping*cosf(ladar_data[LADARi].angle + ROBOTps.theta);
+            ladar_pts[LADARi].y = LADARyoffset + ladar_data[LADARi].distance_ping*sinf(ladar_data[LADARi].angle + ROBOTps.theta);
+
+        }
+    } else if (LADARpingpong == 0) {
+        // LADARrightfront is the min of dist 52, 53, 54, 55, 56
+        LADARrightfront = 19; // 19 is greater than max feet
+        for (LADARi = 52; LADARi <= 56 ; LADARi++) {
+            if (ladar_data[LADARi].distance_pong < LADARrightfront) {
+                LADARrightfront = ladar_data[LADARi].distance_pong;
+            }
+        }
+        // LADARfront is the min of dist 111, 112, 113, 114, 115
+        LADARfront = 19;
+        for (LADARi = 111; LADARi <= 115 ; LADARi++) {
+            if (ladar_data[LADARi].distance_pong < LADARfront) {
+                LADARfront = ladar_data[LADARi].distance_pong;
+            }
+        }
+        LADARxoffset = ROBOTps.x + (LADARps.x*cosf(ROBOTps.theta)-LADARps.y*sinf(ROBOTps.theta - PI/2.0));
+        LADARyoffset = ROBOTps.y + (LADARps.x*sinf(ROBOTps.theta)-LADARps.y*cosf(ROBOTps.theta - PI/2.0));
+        for (LADARi = 0; LADARi < 228; LADARi++) {
+
+            ladar_pts[LADARi].x = LADARxoffset + ladar_data[LADARi].distance_pong*cosf(ladar_data[LADARi].angle + ROBOTps.theta);
+            ladar_pts[LADARi].y = LADARyoffset + ladar_data[LADARi].distance_pong*sinf(ladar_data[LADARi].angle + ROBOTps.theta);
+
+        }
+    }
+
+
+
+
+    //###############################################################################################
+    //
+    // Restore registers saved:
+    //
+    DINT;
+    PieCtrlRegs.PIEIER12.all = TempPIEIER;
+
+}
+
+//
+// Connected to PIEIER12_11 (use MINT12 and MG12_11 masks):
+//
+__interrupt void SWI3_LowestPriority(void)     // FLASH_CORRECTABLE_ERROR
+{
+    // Set interrupt priority:
+    volatile Uint16 TempPIEIER = PieCtrlRegs.PIEIER12.all;
+    IER |= M_INT12;
+    IER    &= MINT12;                          // Set "global" priority
+    PieCtrlRegs.PIEIER12.all &= MG12_11;  // Set "group"  priority
+    PieCtrlRegs.PIEACK.all = 0xFFFF;    // Enable PIE interrupts
+    __asm("  NOP");
+    EINT;
+
+    //###############################################################################################
+    // Insert SWI ISR Code here.......
+
+    //###############################################################################################
+    //
+    // Restore registers saved:
+    //
+    DINT;
+    PieCtrlRegs.PIEIER12.all = TempPIEIER;
+
+}
+
+
+// cpu_timer0_isr - CPU Timer0 ISR
+__interrupt void cpu_timer0_isr(void)
+{
+    CpuTimer0.InterruptCount++;
+
+    numTimer0calls++;
+
+    //    if ((numTimer0calls%50) == 0) {
+    //        PieCtrlRegs.PIEIFR12.bit.INTx9 = 1;  // Manually cause the interrupt for the SWI
+    //    }
+
+    if ((numTimer0calls%5) == 0) {
+        // Blink LaunchPad Red LED
+        GpioDataRegs.GPBTOGGLE.bit.GPIO34 = 1;
+    }
+
+
+    // Acknowledge this interrupt to receive more interrupts from group 1
+    PieCtrlRegs.PIEACK.all = PIEACK_GROUP1;
+}
+
+// cpu_timer1_isr - CPU Timer1 ISR
+__interrupt void cpu_timer1_isr(void)
+{
+    serial_sendSCIC(&SerialC, G_command, G_len);
+    CpuTimer1.InterruptCount++;
+}
+
+// cpu_timer2_isr CPU Timer2 ISR
+__interrupt void cpu_timer2_isr(void)
+{
+    // Blink LaunchPad Blue LED
+    GpioDataRegs.GPATOGGLE.bit.GPIO31 = 1;
+
+    CpuTimer2.InterruptCount++;
+
+    //    if ((CpuTimer2.InterruptCount % 10) == 0) {
+    //        UARTPrint = 1;
+    //    }
+}
+//SM Added
+__interrupt void SPIB_isr(void){
+    //SE423 E3
+    //    spivalue1 = SpibRegs.SPIRXBUF; //SM Read first 16 bit value off RX FIFO. Probably is zero since no chip
+    //    spivalue2 = SpibRegs.SPIRXBUF; //SM Read second 16 bit value off RX FIFO. Again probably zero
+    GpioDataRegs.GPCSET.bit.GPIO66 = 1; //SM Set GPIO 66 high to end Slave Select. Now to Scope. Later to deselect MPU9250.  
+    spivalue1 = SpibRegs.SPIRXBUF;
+    spivalue2 = SpibRegs.SPIRXBUF;
+    spivalue3 = SpibRegs.SPIRXBUF;
+    spivalue4 = SpibRegs.SPIRXBUF;
+    spivalue5 = SpibRegs.SPIRXBUF;
+    spivalue6 = SpibRegs.SPIRXBUF;
+    spivalue7 = SpibRegs.SPIRXBUF;
+    spivalue8 = SpibRegs.SPIRXBUF;
+
+    accelx = (spivalue2/32767.0)*4.0;
+    accely = (spivalue3/32767.0)*4.0;
+    accelz = (spivalue4/32767.0)*4.0;
+    //        temp = 0;
+    gyrox = (spivalue6/32767.0)*250.0;
+    gyroy = (spivalue7/32767.0)*250.0;
+    gyroz = (spivalue8/32767.0)*250.0;
+
+
+    PostSWI1();
 
     spibCount++;
     // Later when actually communicating with the MPU9250 do something with the data. Now do nothing.
@@ -698,7 +923,12 @@ void setEPWM2A(float controleffort){
     }
     EPwm2Regs.CMPA.bit.CMPA = EPwm2Regs.TBPRD * (0.05 * controleffort + 0.5) ;
 }
-
+void PostSWI1(void) {
+    PieCtrlRegs.PIEIFR12.bit.INTx9 = 1; // Manually cause the interrupt for the SWI1
+}
+void PostSWI3(void) {
+    PieCtrlRegs.PIEIFR12.bit.INTx11 = 1; // Manually cause the interrupt for the SWI3
+}
 void init_eQEPs(void) {
     // setup eQEP1 pins for input
     EALLOW;
