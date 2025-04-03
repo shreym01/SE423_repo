@@ -18,4 +18,6 @@ serial_COMandOpti: serial_COMandOpti.o serial_dev.o netapi.o
 
 clean:
 	rm -rf *.o $(targets)
-  
+shm:
+	dos2unix shmdelete.sh
+	chmod +x shmdelete.sh
