@@ -63,7 +63,6 @@ extern float printLV2;
 
 extern float LADARrightfront;
 extern float LADARfront;
-float LADARright;
 
 extern LVSendFloats_t DataToLabView;
 extern char LVsenddata[LVNUM_TOFROM_FLOATS*4+2];
@@ -139,7 +138,6 @@ float Vneg = 2.2;
 float Cpos = 2.116;
 float Cneg = -2.116;
 
-
 float vref = 1.0;
 float turn = 0.0;
 
@@ -150,12 +148,9 @@ float left_turn_Stop_threshold = 4.5;
 float Kp_right_wall = -1;
 float Kp_front_wall = -0.5;
 float front_turn_velocity = 0.4;
-float forward_velocity = 1.0;
+float forward_velocity = 0.0;
 float turn_command_saturation = 1.0;
 int16_t right_wall_follow_state = 2;
-
-float theta_old = 0.0;
-float gyroz_old = 0.0;
 
 float Ki = 15.0;
 float Kp = 3.0;
@@ -176,16 +171,8 @@ float errRight_old = 0;
 float int4Z = 0.0;
 float intZ = 0.0;
 
-float intgyroz = 0.0;
-float intgyroz_old = 0.0;
 float int4Z_old = 0.0;
 float intZ_old = 0.0;
-
-float vavg = 0.0;
-float vavg_old = 0.0;
-
-float x_old = 0.0;
-float y_old = 0.0;
 
 float z4_old = 0.0;
 float Z_old = 0.0;
@@ -388,7 +375,7 @@ void main(void)
     // 200MHz CPU Freq,                       Period (in uSeconds)
     ConfigCpuTimer(&CpuTimer0, LAUNCHPAD_CPU_FREQUENCY, 100000);
     ConfigCpuTimer(&CpuTimer1, LAUNCHPAD_CPU_FREQUENCY, 20000);
-    ConfigCpuTimer(&CpuTimer2, LAUNCHPAD_CPU_FREQUENCY, 10000);
+    ConfigCpuTimer(&CpuTimer2, LAUNCHPAD_CPU_FREQUENCY, 1000);
 
     // Enable CpuTimer Interrupt bit TIE
     CpuTimer0Regs.TCR.all = 0x4000;
@@ -530,8 +517,7 @@ void main(void)
             //            UART_printfLine(2," 4Z %.2f, Z %.2f", int4Z, intZ);
             //            UART_printfLine(1,"v1 %.2f,v2 %.2f",v1, v2);
             //            UART_printfLine(2,"Vref %.2f,turn %.2f ",Vref, turn);
-            UART_printfLine(1," theta %.2f", ROBOTps.theta);
-            UART_printfLine(2,"X %.2f, Y %.3f", ROBOTps.x, ROBOTps.y);
+            UART_printfLine(1," gyroZ %.2f", gyroz);
             UARTPrint = 0;
         }
     }
@@ -595,18 +581,11 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             break;
         case 2:
             //Right Wall Follow
-            if((LADARrightfront > 25)&&(LADARright < 20)){
-                turn = Kp_right_wall*(ref_right_wall - LADARright);
-            }
-            else {
-                turn = Kp_right_wall*(ref_right_wall - LADARrightfront);
-            }
+            turn = Kp_right_wall*(ref_right_wall - LADARrightfront);
             vref = forward_velocity;
             if (LADARfront < left_turn_Start_threshold) {
                 right_wall_follow_state = 1;
             }
-
-
             break;
         }
         if (turn > turn_command_saturation){
@@ -632,12 +611,6 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
         int4Z = int4Z_old + ((z4 + z4_old)*0.5)* 0.001;
         intZ = intZ_old + ((Z + Z_old)*0.5)* 0.001;
-
-        intgyroz = intgyroz_old + ((gyroz + gyroz_old)*0.5)* 0.001;
-        ROBOTps.theta = intgyroz * PI/180;
-        vavg = (v1 + v2)/2;
-        ROBOTps.x = x_old +((vavg + vavg_old)*.5*.001)*cos(ROBOTps.theta);
-        ROBOTps.y = y_old +((vavg + vavg_old)*.5*.001)*sin(ROBOTps.theta);
 
         if (v1 > 0.0) {
             uLeft = uLeft +0.6 * Vpos * v1 + 0.6* Cpos;
@@ -676,20 +649,12 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         int4Z_old = int4Z;
         intZ_old = intZ;
 
-        theta_old = ROBOTps.theta;
-        gyroz_old = gyroz;
-        intgyroz_old = intgyroz;
-
-        vavg_old = vavg;
-        x_old = ROBOTps.x;
-        y_old = ROBOTps.y;
-
     }
 
     if (newLinuxCommands == 1) {
         newLinuxCommands = 0;
-//        vref = LinuxCommands[0];
-//        turn = LinuxCommands[1];
+        vref = LinuxCommands[0];
+        turn = LinuxCommands[1];
         ref_right_wall = LinuxCommands[2];
         left_turn_Start_threshold = LinuxCommands[3];
         left_turn_Stop_threshold = LinuxCommands[4];
@@ -764,13 +729,6 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
     if (LADARpingpong == 1) {
         // LADARrightfront is the min of dist 52, 53, 54, 55, 56
         LADARrightfront = 19; // 19 is greater than max feet
-        // LADARfront is the min of dist 111, 112, 113, 114, 115
-        LADARright = 19;
-        for (LADARi = 30; LADARi <= 34 ; LADARi++) {
-            if (ladar_data[LADARi].distance_ping < LADARright) {
-                LADARright = ladar_data[LADARi].distance_ping;
-            }
-        }
         for (LADARi = 52; LADARi <= 56 ; LADARi++) {
             if (ladar_data[LADARi].distance_ping < LADARrightfront) {
                 LADARrightfront = ladar_data[LADARi].distance_ping;
@@ -781,13 +739,6 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
         for (LADARi = 111; LADARi <= 115 ; LADARi++) {
             if (ladar_data[LADARi].distance_ping < LADARfront) {
                 LADARfront = ladar_data[LADARi].distance_ping;
-            }
-        }
-        // LADARfront is the min of dist 111, 112, 113, 114, 115
-        LADARright = 19;
-        for (LADARi = 0; LADARi <= 40 ; LADARi++) {
-            if (ladar_data[LADARi].distance_ping < LADARright) {
-                LADARright = ladar_data[LADARi].distance_ping;
             }
         }
         LADARxoffset = ROBOTps.x + (LADARps.x*cosf(ROBOTps.theta)-LADARps.y*sinf(ROBOTps.theta - PI/2.0));
@@ -898,9 +849,9 @@ __interrupt void cpu_timer2_isr(void)
 
     CpuTimer2.InterruptCount++;
 
-    if ((CpuTimer2.InterruptCount % 100) == 0) {
-        UARTPrint = 1;
-    }
+    //    if ((CpuTimer2.InterruptCount % 10) == 0) {
+    //        UARTPrint = 1;
+    //    }
 }
 //SM Added
 __interrupt void SPIB_isr(void){
@@ -1310,374 +1261,374 @@ void setupSpib(void) //Call this function in main() somewhere after the DINT; li
 }
 
 
-//#include <stdio.h>
-//#include <stdlib.h>
-//#include <sys/ioctl.h>
-//#include <sys/types.h>
-//#include <sys/stat.h>
-//#include <fcntl.h>
-//#include <string.h>
-//#include <unistd.h>
-//#include <semaphore.h>
-//#include <sys/mman.h>
-//#include <signal.h>
-//#include <pthread.h>
-//#include <sched.h> // for sched_yield()
-//#include <assert.h>
-//#include <sys/resource.h>
-//#include <math.h>
-//#include <dirent.h>
-//#include <sys/time.h>
-//#include <errno.h>
-//#include <stdint.h>
-//#include <sys/signal.h>
-//#include <termios.h>
-//#include <ctype.h>
-//
-//int gs_quit = 0;
-//int gs_exit = 0;
-//
-//float vref = 1.0;
-//float turn = 0.0;
-//float ref_right_wall = 0.0;
-//float left_turn_Start_threshold = 0.0;
-//float left_turn_Stop_threshold = 0.0;
-//float Kp_right_wall = 0.1;
-//float Kp_front_wall = 0.1;
-//float front_turn_velocity = 0.4;
-//float forward_velocity = 0.0;
-//float turn_command_saturation = 1.0;
-//
-//int sem_count_send = 0; //for sem_getvalue
-//#define CMDNUM_FROM_FLOATS 11
-//#define RECVFROM_LINUXCMDAPP_SEM_MUTEX_NAME "/sem-LINUXCMDApp-recvfrom"
-//#define RECVFROM_LINUXCMDAPP_SHARED_MEM_NAME "/sharedmem-LINUXCMDApp-recvfrom"
-//
-//typedef union {
-//    char data_char[4*CMDNUM_FROM_FLOATS];
-//    float data_flts[CMDNUM_FROM_FLOATS];
-//} int_FromCMD_union;
-//
-//struct shared_memory_recvfrom_LINUXCMDApp
-//{
-//  int_FromCMD_union new_FromCMD;
-//};
-//
-//struct shared_memory_recvfrom_LINUXCMDApp *shared_mem_ptr_recvfrom_LINUXCMDApp;
-//sem_t *recvfrom_LINUXCMDApp_mutex_sem;
-//int recvfrom_LINUXCMDApp_fd_shm;
-//
-//
-//int mygetch(void)
-//{
-//	struct termios oldt,
-//	newt;
-//	int ch;
-//	tcgetattr( STDIN_FILENO, &oldt );
-//	newt = oldt;
-//	newt.c_lflag &= ~( ICANON | ECHO );
-//	tcsetattr( STDIN_FILENO, TCSANOW, &newt );
-//	ch = getchar();
-//	tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
-//	return ch;
-//}
-//
-//
-//// Print system error and exit
-//void error (char *msg)
-//{
-//    perror (msg);
-//    exit (1);
-//}
-//
-///*
-//* gs_killapp()
-//*   ends application safely
-//*
-//*/
-//void gs_killapp(int s)
-//{
-//	printf("\nTerminating\n");
-//	gs_quit = 1;
-//	gs_exit = 1;
-//	return;
-//}
-//
-///*
-//* main()
-//*   process command line input
-//*/
-//int main (int argc, char **argv)
-//{
-//	int i = 0;
-//
-//	char buffer[200];  // used by fgets to read character string typed by user.
-//	char mychar;
-//	float tempfloat = 0;
-//
-//	fflush(stdout);
-//
-//
-//    //create the semaphore for recv
-//    if ((recvfrom_LINUXCMDApp_mutex_sem = sem_open(RECVFROM_LINUXCMDAPP_SEM_MUTEX_NAME, 0, 0, 0)) == SEM_FAILED)
-//        error("Error recv LINUXCMDApp sem_open");
-//
-//    // create shared memory for recv
-//    if ((recvfrom_LINUXCMDApp_fd_shm = shm_open(RECVFROM_LINUXCMDAPP_SHARED_MEM_NAME, O_RDWR, 0)) == -1)
-//        error("Error shm_open LINUXCMDApp");
-//
-//    //map the memory to virtual address
-//    if ((shared_mem_ptr_recvfrom_LINUXCMDApp = mmap(NULL, sizeof(struct shared_memory_recvfrom_LINUXCMDApp), PROT_READ | PROT_WRITE, MAP_SHARED,
-//                                recvfrom_LINUXCMDApp_fd_shm, 0)) == MAP_FAILED)
-//        error("Error mmap LINUXCMDApp");
-//
-//	printf("Setting signal handler...\n");
-//	signal(SIGKILL, gs_killapp);
-//	signal(SIGINT, gs_killapp);
-//	printf("...OK\n");
-//	printf(".\n");
-//	while (!gs_exit) {
-//		sched_yield();
-//
-//		printf("\n\n");
-//		printf("Menu of Selections\n");
-//		printf("DO NOT PRESS CTRL-C when in this menu selection\n");
-//		printf("e - Exit Application\n");
-//		printf("s - enter Desired Velocity Setpoint and RightWall speed (ft/s)\n");
-//		printf("q - increment Left\n");
-//		printf("p - increment Right\n");
-//		printf("z - ref_right_wall\n");
-//		printf("x - left_turn_Start_threshold\n");
-//		printf("c - left_turn_Stop_threshold\n");
-//		printf("v - Kp_right_wall\n");
-//		printf("b - Kp_front_wall\n");
-//		printf("n - front_turn_velocity\n");
-//		printf("m - forward_velocity\n");
-//		printf(", - turn_command_saturation\n");
-//		printf("l - List All Parameters\n");
-//
-//		mychar = (char) mygetch();
-//
-//		switch (mychar) {
-//		case 'q':
-//			if (turn > 0.0) {
-//				turn = 0.0;
-//			} else {
-//				turn = turn - 0.2;
-//			}
-//			printf("turn =%.3f\n",turn);
-//			break;
-//		case 'p':
-//			if (turn < 0.0) {
-//				turn = 0.0;
-//			} else {
-//				turn = turn + 0.2;
-//			}
-//			printf("turn =%.3f\n",turn);
-//			break;
-//		case 'e':
-//			gs_exit = 1;
-//			break;
-//		case 's':
-//			printf("Enter Desired Velocity (vref) and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					vref = tempfloat;
-//					printf("DVel = %.3f\n",vref);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: vref not changed\n");
-//			}
-//
-//			break;
-//		case 'z':
-//			printf("Enter Desired ref_right_wall (ref_right_wall) and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					ref_right_wall = tempfloat;
-//					printf("desired ref_right_wall = %.3f\n",ref_right_wall);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: ref_right_wall not changed\n");
-//			}
-//
-//			break;
-//		case 'x':
-//			printf("Enter Desired left_turn_Start_threshold (left_turn_Start_threshold) and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					left_turn_Start_threshold = tempfloat;
-//					printf("desired left_turn_Start_threshold = %.3f\n",left_turn_Start_threshold);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: left_turn_Start_threshold not changed\n");
-//			}
-//
-//			break;
-//		case 'c':
-//			printf("Enter Desired left_turn_Stop_threshold and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					left_turn_Stop_threshold = tempfloat;
-//					printf("desired left_turn_Stop_threshold = %.3f\n",left_turn_Stop_threshold);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: left_turn_Stop_threshold not changed\n");
-//			}
-//
-//			break;
-//		case 'v':
-//			printf("Enter Desired Kp_right_wall and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					Kp_right_wall = tempfloat;
-//					printf("desired Kp_right_wall = %.3f\n",Kp_right_wall);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: Kp_right_wall not changed\n");
-//			}
-//
-//			break;
-//		case 'b':
-//			printf("Enter Desired Kp_front_wall and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					Kp_front_wall = tempfloat;
-//					printf("desired Kp_front_wall = %.3f\n",Kp_front_wall);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: Kp_front_wall not changed\n");
-//			}
-//
-//			break;
-//		case 'n':
-//			printf("Enter Desired front_turn_velocity and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					front_turn_velocity = tempfloat;
-//					printf("desired front_turn_velocity = %.3f\n",front_turn_velocity);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: front_turn_velocity not changed\n");
-//			}
-//
-//			break;
-//		case 'm':
-//			printf("Enter Desired forward_velocity and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					forward_velocity = tempfloat;
-//					printf("desired forward_velocity = %.3f\n",forward_velocity);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: forward_velocity not changed\n");
-//			}
-//
-//			break;
-//		case ',':
-//			printf("Enter Desired turn_command_saturation and Right Wall velocity\n");
-//			fgets(buffer,190,stdin);
-//			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//			if (buffer[0] != '\0') {
-//				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//					turn_command_saturation = tempfloat;
-//					printf("desired turn_command_saturation = %.3f\n",turn_command_saturation);
-//				}  else {
-//					printf("Error: Non numerical value typed\n");
-//				}
-//			} else {
-//				printf("Error: turn_command_saturation not changed\n");
-//			}
-//
-//			break;
-//		// case '.':
-//		// 	printf("Enter Desired Velocity (vref) and Right Wall velocity\n");
-//		// 	fgets(buffer,190,stdin);
-//		// 	buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
-//		// 	if (buffer[0] != '\0') {
-//		// 		if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
-//		// 			vref = tempfloat;
-//		// 			printf("DVel = %.3f\n",vref);
-//		// 		}  else {
-//		// 			printf("Error: Non numerical value typed\n");
-//		// 		}
-//		// 	} else {
-//		// 		printf("Error: vref not changed\n");
-//		// 	}
-//
-//		// 	break;
-//		case 'l':
-//			printf("\n");
-//			printf("turn = %.3f\n",turn);
-//			printf("vref = %.3f\n",vref);
-//			printf("ref_right_wall = %.3f\n",ref_right_wall);
-//			printf("left_turn_Start_threshold = %.3f\n",left_turn_Start_threshold);
-//			printf("left_turn_Stop_threshold = %.3f\n",left_turn_Stop_threshold);
-//			printf("Kp_right_wall = %.3f\n",Kp_right_wall);
-//			printf("Kp_front_wall = %.3f\n",Kp_front_wall);
-//			printf("front_turn_velocity = %.3f\n",front_turn_velocity);
-//			printf("forward_velocity = %.3f\n",forward_velocity);
-//			printf("turn_command_saturation = %.3f\n",turn_command_saturation);
-//
-//			break;
-//		default:
-//
-//			break;
-//		}
-//
-//		shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[0] = vref;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[1] = turn;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[2] = ref_right_wall;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[3] = left_turn_Start_threshold;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[4] = left_turn_Stop_threshold;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[5] = Kp_right_wall;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[6] = Kp_front_wall;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[7] = front_turn_velocity;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[8] = forward_velocity;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[9] = turn_command_saturation;
-//        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[10] = 0;
-//
-//		if (sem_getvalue(recvfrom_LINUXCMDApp_mutex_sem,  &sem_count_send) == 0) {
-//			if (sem_post(recvfrom_LINUXCMDApp_mutex_sem) == -1){
-//				printf("Error LINUXCMDApp sem_post: recvfrom_mutex");
-//			}
-//		}
-//
-//	}
-//
-//}
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+#include <unistd.h>
+#include <semaphore.h>
+#include <sys/mman.h>
+#include <signal.h>
+#include <pthread.h>
+#include <sched.h> // for sched_yield()
+#include <assert.h>
+#include <sys/resource.h>
+#include <math.h>
+#include <dirent.h>
+#include <sys/time.h>
+#include <errno.h>
+#include <stdint.h>
+#include <sys/signal.h>
+#include <termios.h>
+#include <ctype.h>
+
+int gs_quit = 0;
+int gs_exit = 0;
+
+float vref = 1.0;
+float turn = 0.0;
+float ref_right_wall = 0.0;
+float left_turn_Start_threshold = 0.0;
+float left_turn_Stop_threshold = 0.0;
+float Kp_right_wall = 0.1;
+float Kp_front_wall = 0.1;
+float front_turn_velocity = 0.4;
+float forward_velocity = 0.0;
+float turn_command_saturation = 1.0;
+
+int sem_count_send = 0; //for sem_getvalue
+#define CMDNUM_FROM_FLOATS 11
+#define RECVFROM_LINUXCMDAPP_SEM_MUTEX_NAME "/sem-LINUXCMDApp-recvfrom"
+#define RECVFROM_LINUXCMDAPP_SHARED_MEM_NAME "/sharedmem-LINUXCMDApp-recvfrom"
+
+typedef union {
+    char data_char[4*CMDNUM_FROM_FLOATS];
+    float data_flts[CMDNUM_FROM_FLOATS];
+} int_FromCMD_union;
+
+struct shared_memory_recvfrom_LINUXCMDApp
+{
+  int_FromCMD_union new_FromCMD;
+};
+
+struct shared_memory_recvfrom_LINUXCMDApp *shared_mem_ptr_recvfrom_LINUXCMDApp;
+sem_t *recvfrom_LINUXCMDApp_mutex_sem;
+int recvfrom_LINUXCMDApp_fd_shm;
+
+
+int mygetch(void)
+{
+	struct termios oldt,
+	newt;
+	int ch;
+	tcgetattr( STDIN_FILENO, &oldt );
+	newt = oldt;
+	newt.c_lflag &= ~( ICANON | ECHO );
+	tcsetattr( STDIN_FILENO, TCSANOW, &newt );
+	ch = getchar();
+	tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
+	return ch;
+}
+
+
+// Print system error and exit
+void error (char *msg)
+{
+    perror (msg);
+    exit (1);
+}
+
+/*  
+* gs_killapp()
+*   ends application safely
+*
+*/
+void gs_killapp(int s)
+{
+	printf("\nTerminating\n");
+	gs_quit = 1;
+	gs_exit = 1;
+	return;
+}
+
+/*
+* main()
+*   process command line input
+*/
+int main (int argc, char **argv)
+{
+	int i = 0;
+
+	char buffer[200];  // used by fgets to read character string typed by user.
+	char mychar;
+	float tempfloat = 0;
+	
+	fflush(stdout);
+	 
+  	
+    //create the semaphore for recv 
+    if ((recvfrom_LINUXCMDApp_mutex_sem = sem_open(RECVFROM_LINUXCMDAPP_SEM_MUTEX_NAME, 0, 0, 0)) == SEM_FAILED)
+        error("Error recv LINUXCMDApp sem_open");
+
+    // create shared memory for recv
+    if ((recvfrom_LINUXCMDApp_fd_shm = shm_open(RECVFROM_LINUXCMDAPP_SHARED_MEM_NAME, O_RDWR, 0)) == -1)
+        error("Error shm_open LINUXCMDApp");
+
+    //map the memory to virtual address
+    if ((shared_mem_ptr_recvfrom_LINUXCMDApp = mmap(NULL, sizeof(struct shared_memory_recvfrom_LINUXCMDApp), PROT_READ | PROT_WRITE, MAP_SHARED,
+                                recvfrom_LINUXCMDApp_fd_shm, 0)) == MAP_FAILED)
+        error("Error mmap LINUXCMDApp");
+
+	printf("Setting signal handler...\n");
+	signal(SIGKILL, gs_killapp);
+	signal(SIGINT, gs_killapp);
+	printf("...OK\n");
+	printf(".\n");
+	while (!gs_exit) {
+		sched_yield();
+
+		printf("\n\n");
+		printf("Menu of Selections\n");
+		printf("DO NOT PRESS CTRL-C when in this menu selection\n");
+		printf("e - Exit Application\n");
+		printf("s - enter Desired Velocity Setpoint and RightWall speed (ft/s)\n");
+		printf("q - increment Left\n");
+		printf("p - increment Right\n");
+		printf("z - ref_right_wall\n");
+		printf("x - left_turn_Start_threshold\n");
+		printf("c - left_turn_Stop_threshold\n");
+		printf("v - Kp_right_wall\n");
+		printf("b - Kp_front_wall\n");
+		printf("n - front_turn_velocity\n");
+		printf("m - forward_velocity\n");
+		printf(", - turn_command_saturation\n");
+		printf("l - List All Parameters\n");
+
+		mychar = (char) mygetch();
+		
+		switch (mychar) {
+		case 'q':
+			if (turn > 0.0) {
+				turn = 0.0;
+			} else {
+				turn = turn - 0.2;
+			}
+			printf("turn =%.3f\n",turn);
+			break;
+		case 'p':                                
+			if (turn < 0.0) {
+				turn = 0.0;
+			} else {
+				turn = turn + 0.2;
+			}
+			printf("turn =%.3f\n",turn);
+			break;
+		case 'e':
+			gs_exit = 1;
+			break;
+		case 's':
+			printf("Enter Desired Velocity (vref) and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					vref = tempfloat;
+					printf("DVel = %.3f\n",vref);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: vref not changed\n");
+			}
+			
+			break;
+		case 'z':
+			printf("Enter Desired ref_right_wall (ref_right_wall) and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					ref_right_wall = tempfloat;
+					printf("desired ref_right_wall = %.3f\n",ref_right_wall);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: ref_right_wall not changed\n");
+			}
+			
+			break;	
+		case 'x':
+			printf("Enter Desired left_turn_Start_threshold (left_turn_Start_threshold) and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					left_turn_Start_threshold = tempfloat;
+					printf("desired left_turn_Start_threshold = %.3f\n",left_turn_Start_threshold);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: left_turn_Start_threshold not changed\n");
+			}
+			
+			break;
+		case 'c':
+			printf("Enter Desired left_turn_Stop_threshold and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					left_turn_Stop_threshold = tempfloat;
+					printf("desired left_turn_Stop_threshold = %.3f\n",left_turn_Stop_threshold);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: left_turn_Stop_threshold not changed\n");
+			}
+			
+			break;
+		case 'v':
+			printf("Enter Desired Kp_right_wall and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					Kp_right_wall = tempfloat;
+					printf("desired Kp_right_wall = %.3f\n",Kp_right_wall);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: Kp_right_wall not changed\n");
+			}
+			
+			break;	
+		case 'b':
+			printf("Enter Desired Kp_front_wall and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					Kp_front_wall = tempfloat;
+					printf("desired Kp_front_wall = %.3f\n",Kp_front_wall);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: Kp_front_wall not changed\n");
+			}
+			
+			break;	
+		case 'n':
+			printf("Enter Desired front_turn_velocity and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					front_turn_velocity = tempfloat;
+					printf("desired front_turn_velocity = %.3f\n",front_turn_velocity);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: front_turn_velocity not changed\n");
+			}
+			
+			break;	
+		case 'm':
+			printf("Enter Desired forward_velocity and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					forward_velocity = tempfloat;
+					printf("desired forward_velocity = %.3f\n",forward_velocity);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: forward_velocity not changed\n");
+			}
+			
+			break;	
+		case ',':
+			printf("Enter Desired turn_command_saturation and Right Wall velocity\n");
+			fgets(buffer,190,stdin); 
+			buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+			if (buffer[0] != '\0') {
+				if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+					turn_command_saturation = tempfloat;
+					printf("desired turn_command_saturation = %.3f\n",turn_command_saturation);
+				}  else {
+					printf("Error: Non numerical value typed\n");
+				}
+			} else {
+				printf("Error: turn_command_saturation not changed\n");
+			}
+			
+			break;	
+		// case '.':
+		// 	printf("Enter Desired Velocity (vref) and Right Wall velocity\n");
+		// 	fgets(buffer,190,stdin); 
+		// 	buffer[strlen(buffer)-1] = '\0';  // get ride of '\n' in returned string
+		// 	if (buffer[0] != '\0') {
+		// 		if (sscanf(buffer,"%f",&tempfloat) != 0) {  // check that it was a number entered
+		// 			vref = tempfloat;
+		// 			printf("DVel = %.3f\n",vref);
+		// 		}  else {
+		// 			printf("Error: Non numerical value typed\n");
+		// 		}
+		// 	} else {
+		// 		printf("Error: vref not changed\n");
+		// 	}
+			
+		// 	break;	
+		case 'l':
+			printf("\n");
+			printf("turn = %.3f\n",turn);
+			printf("vref = %.3f\n",vref);
+			printf("ref_right_wall = %.3f\n",ref_right_wall);
+			printf("left_turn_Start_threshold = %.3f\n",left_turn_Start_threshold);
+			printf("left_turn_Stop_threshold = %.3f\n",left_turn_Stop_threshold);
+			printf("Kp_right_wall = %.3f\n",Kp_right_wall);
+			printf("Kp_front_wall = %.3f\n",Kp_front_wall);
+			printf("front_turn_velocity = %.3f\n",front_turn_velocity);
+			printf("forward_velocity = %.3f\n",forward_velocity);
+			printf("turn_command_saturation = %.3f\n",turn_command_saturation);
+
+			break;	
+		default:
+			
+			break;
+		}
+		
+		shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[0] = vref;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[1] = turn;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[2] = ref_right_wall;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[3] = left_turn_Start_threshold;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[4] = left_turn_Stop_threshold;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[5] = Kp_right_wall;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[6] = Kp_front_wall;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[7] = front_turn_velocity;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[8] = forward_velocity;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[9] = turn_command_saturation;
+        shared_mem_ptr_recvfrom_LINUXCMDApp->new_FromCMD.data_flts[10] = 0;
+
+		if (sem_getvalue(recvfrom_LINUXCMDApp_mutex_sem,  &sem_count_send) == 0) {
+			if (sem_post(recvfrom_LINUXCMDApp_mutex_sem) == -1){
+				printf("Error LINUXCMDApp sem_post: recvfrom_mutex");
+			}
+		}
+		
+	}
+
+}
 
 
 
