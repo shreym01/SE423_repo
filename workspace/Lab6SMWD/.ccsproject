@@ -13,4 +13,6 @@
 	<templateProperties value="id=LADAR_PICOM_starter.projectspec.LADAR_PICOMstarter"/>
 	<origin value="C:\smath24_wd10\SE423_repo\C2000Ware_4_01_00_00\device_support\f2837xd\examples\cpu1\LADAR_PICOM_starter\cpu01\ccs\LADAR_PICOM_starter.projectspec"/>
 	<filesToOpen value=""/>
+	<connection value="common/targetdb/connections/TIXDS2XXUSB_Connection.xml"/>
+	<isTargetManual value="false"/>
 </projectOptions>
