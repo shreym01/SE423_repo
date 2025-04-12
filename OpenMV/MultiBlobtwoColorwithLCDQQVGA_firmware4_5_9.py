@@ -121,41 +121,43 @@ while True:
         b = ustruct.pack(blob_packet, 0.0, 0.0, 0.0)
         uart.write(b)
     tagfound = 0
-    for tag in img.find_apriltags(
-        fx=f_x, fy=f_y, cx=c_x, cy=c_y
-    ):  # defaults to TAG36H11
-        tagfound = 1
-        img.draw_rectangle(tag.rect, color=(255, 0, 0))
-        img.draw_cross(tag.cx, tag.cy, color=(0, 255, 0))
-        print_args = (
-            tag.id,
-            tag.x_translation,
-            tag.y_translation,
-            tag.z_translation,
-            degrees(tag.x_rotation),
-            degrees(tag.y_rotation),
-            degrees(tag.z_rotation),
-        )
-        # Translation units are unknown. Rotation units are in degrees.
-        print("id: %d Tx: %f, Ty %f, Tz %f, Rx %f, Ry %f, Rz %f" % print_args)
-        if tag.id <= 2.0:   #if two or more tags are found the send will send again and robot will receive both in the same variables write over the first one  If two tags are needed, more code is needed.
+    runtag = 0 #set this to 1 if you want to look for april tags
+    if runtag == 1:
+        for tag in img.find_apriltags(
+            fx=f_x, fy=f_y, cx=c_x, cy=c_y
+        ):  # defaults to TAG36H11
+            tagfound = 1
+            img.draw_rectangle(tag.rect, color=(255, 0, 0))
+            img.draw_cross(tag.cx, tag.cy, color=(0, 255, 0))
+            print_args = (
+                tag.id,
+                tag.x_translation,
+                tag.y_translation,
+                tag.z_translation,
+                degrees(tag.x_rotation),
+                degrees(tag.y_rotation),
+                degrees(tag.z_rotation),
+            )
+            # Translation units are unknown. Rotation units are in degrees.
+            print("id: %d Tx: %f, Ty %f, Tz %f, Rx %f, Ry %f, Rz %f" % print_args)
+            if tag.id <= 2.0:   #if two or more tags are found the send will send again and robot will receive both in the same variables write over the first one  If two tags are needed, more code is needed.
+                msg = "*$".encode()
+                uart.write(msg)
+                b = ustruct.pack(blob_packet, tag.x_translation, tag.y_translation, tag.z_translation)
+                uart.write(b)
+                b = ustruct.pack(blob_packet, degrees(tag.x_rotation), degrees(tag.y_rotation), degrees(tag.z_rotation))
+                uart.write(b)
+                b = ustruct.pack(blob_packet, tag.id, 0.0, 0.0)
+                uart.write(b)
+        if tagfound == 0:
             msg = "*$".encode()
             uart.write(msg)
-            b = ustruct.pack(blob_packet, tag.x_translation, tag.y_translation, tag.z_translation)
+            b = ustruct.pack(blob_packet, 0.0, 0.0, 0.0)
             uart.write(b)
-            b = ustruct.pack(blob_packet, degrees(tag.x_rotation), degrees(tag.y_rotation), degrees(tag.z_rotation))
+            b = ustruct.pack(blob_packet, 0.0, 0.0, 0.0)
             uart.write(b)
-            b = ustruct.pack(blob_packet, tag.id, 0.0, 0.0)
+            b = ustruct.pack(blob_packet, -1.0, 0.0, 0.0)  #send no tag found
             uart.write(b)
-    if tagfound == 0:
-        msg = "*$".encode()
-        uart.write(msg)
-        b = ustruct.pack(blob_packet, 0.0, 0.0, 0.0)
-        uart.write(b)
-        b = ustruct.pack(blob_packet, 0.0, 0.0, 0.0)
-        uart.write(b)
-        b = ustruct.pack(blob_packet, -1.0, 0.0, 0.0)  #send no tag found
-        uart.write(b)
 
     #roi is left, top, width, height
     #lcd.write(img, roi=(96,80,128,160)) # display the image to lcd only middle 128 cols by 160 rows.
