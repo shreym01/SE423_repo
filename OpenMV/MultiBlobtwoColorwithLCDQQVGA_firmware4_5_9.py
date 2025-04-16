@@ -51,7 +51,10 @@ while True:
                 offcount = 0
     framecount = framecount + 1
     img = sensor.snapshot()
-
+    #roi is Region of Interest  (x,y,w,h) x,y is 0,0 at the Left, Top corner.  x is columns
+    # y is rows.  w = width is postive to the right, h = height is positive down.
+    # only pixels within the roi are processed.  So (0,60,160,60) only processes the bottom
+    # half of the 160X120 image.  You can change this to process more or less of the image
     blobs1 = img.find_blobs([threshold1], roi=(0,60,160,60), pixels_threshold=5, area_threshold=20)
     blobs2 = img.find_blobs([threshold2], roi=(0,60,160,60), pixels_threshold=5, area_threshold=20)
 
@@ -68,6 +71,7 @@ while True:
                 a = float(b.area())
                 x_cnt = float(b.cx())
                 y_cnt = float(b.cy())
+                #print(b.cx(),b.cy())
                 img.draw_rectangle(b[0:4]) # rect on x,y,w,h
                 img.draw_cross(b.cx(), b.cy())
             else:
