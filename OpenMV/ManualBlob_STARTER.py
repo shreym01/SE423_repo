@@ -15,7 +15,7 @@ B_max = ???
 
 sensor.reset()
 sensor.set_pixformat(sensor.RGB565)
-sensor.set_framesize(sensor.QVGA) # 320 columns by 240 rows
+sensor.set_framesize(sensor.QQVGA) # 160 columns by 120 rows
 sensor.skip_frames(time = 2000) # Skip two seconds worth of frames
 sensor.set_auto_gain(False) # must be turned off for color tracking
 sensor.set_auto_whitebal(False) # must be turned off for color tracking
@@ -77,7 +77,7 @@ while(True):
         #---------
 
         # Draw a cross at the centroid
-        img.draw_cross(x_cent, y_cent)
+        img.draw_cross(int(x_cent), int(y_cent))
 
         # Print centroid to the terminal
         print(f"Centroid at: {x_cent}, {y_cent}")
