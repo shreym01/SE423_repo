@@ -110,7 +110,9 @@ extern datapts ladar_data[228];
 
 extern uint16_t newLinuxCommands;
 extern float LinuxCommands[CMDNUM_FROM_FLOATS];
-
+float cubeFit[4] = {-0.000016547, 0.0047285, -0.46261, 16.801};
+float distToBall1 = 0.0;
+float distToBall2 = 0.0;
 extern uint16_t NewLVData;
 extern float fromLVvalues[LVNUM_TOFROM_FLOATS];
 extern LVSendFloats_t DataToLabView;
@@ -278,6 +280,18 @@ uint16_t MPU9250ignoreCNT = 0;  //This is ignoring the first few interrupts if A
 
 float RCangle = 0.0;
 
+float colcentroid = 0.0;
+float kpvision = -0.05;
+int16_t count22 = 0;
+int16_t count24 = 0;
+int16_t count26 = 0;
+int16_t count1 =  2000;
+int16_t count32 = 0;
+int16_t count34 = 0;
+int16_t count36 = 0;
+
+
+
 void main(void)
 {
     // PLL, WatchDog, enable Peripheral Clocks
@@ -313,7 +327,7 @@ void main(void)
     GPIO_SetupPinOptions(67, GPIO_OUTPUT, GPIO_PUSHPULL);
     GpioDataRegs.GPCCLEAR.bit.GPIO67 = 1;
 
-// ----- code for CAN start here -----
+    // ----- code for CAN start here -----
     //GPIO17 - CANRXB
     GPIO_SetupPinMux(17, GPIO_MUX_CPU1, 2);
     GPIO_SetupPinOptions(17, GPIO_INPUT, GPIO_ASYNC);
@@ -321,11 +335,11 @@ void main(void)
     //GPIO12 - CANTXB
     GPIO_SetupPinMux(12, GPIO_MUX_CPU1, 2);
     GPIO_SetupPinOptions(12, GPIO_OUTPUT, GPIO_PUSHPULL);
-// ----- code for CAN end here -----
+    // ----- code for CAN end here -----
 
 
 
-// ----- code for CAN start here -----
+    // ----- code for CAN start here -----
     // Initialize the CAN controller
     InitCANB();
 
@@ -335,7 +349,7 @@ void main(void)
     // Enables Interrupt line 0, Error & Status Change interrupts in CAN_CTL register.
     CanbRegs.CAN_CTL.bit.IE0= 1;
     CanbRegs.CAN_CTL.bit.EIE= 1;
-// ----- code for CAN end here -----
+    // ----- code for CAN end here -----
 
     // Clear all interrupts and initialize PIE vector table:
     // Disable CPU interrupts
@@ -378,9 +392,9 @@ void main(void)
     PieVectTable.EMIF_ERROR_INT = &SWI1_HighestPriority;  // Using Interrupt12 interrupts that are not used as SWIs
     PieVectTable.RAM_CORRECTABLE_ERROR_INT = &SWI2_MiddlePriority;
     PieVectTable.FLASH_CORRECTABLE_ERROR_INT = &SWI3_LowestPriority;
-	// ----- code for CAN start here -----
+    // ----- code for CAN start here -----
     PieVectTable.CANB0_INT = &can_isr;
-// ----- code for CAN end here -----
+    // ----- code for CAN end here -----
     EDIS;    // This is needed to disable write to EALLOW protected registers
 
     // Initialize the CpuTimers Device Peripheral. This function can be
@@ -446,15 +460,15 @@ void main(void)
     PieCtrlRegs.PIEIER12.bit.INTx9 = 1; //SWI1
     PieCtrlRegs.PIEIER12.bit.INTx10 = 1; //SWI2
     PieCtrlRegs.PIEIER12.bit.INTx11 = 1; //SWI3  Lowest priority
-	// ----- code for CAN start here -----
+    // ----- code for CAN start here -----
     // Enable CANB in the PIE: Group 9 interrupt 7
     PieCtrlRegs.PIEIER9.bit.INTx7 = 1;
-// ----- code for CAN end here -----
+    // ----- code for CAN end here -----
 
-// ----- code for CAN start here -----
+    // ----- code for CAN start here -----
     // Enable the CAN interrupt signal
     CanbRegs.CAN_GLB_INT_EN.bit.GLBINT0_EN = 1;
-// ----- code for CAN end here -----
+    // ----- code for CAN end here -----
 
 
     robotdest[0].x = -4;    robotdest[0].y = 10;
@@ -486,14 +500,14 @@ void main(void)
     SpibRegs.SPIFFRX.bit.RXFFINTCLR=1; // Clear Interrupt flag
     PieCtrlRegs.PIEACK.all = PIEACK_GROUP6;
     EPwm4Regs.TBCTL.bit.CTRMODE = 0; //unfreeze, and enter up count mode
-	
+
     init_serialSCIA(&SerialA,115200);
     init_serialSCID(&SerialD,2083332);
 
     // Enable global Interrupts and higher priority real-time debug events
     EINT;  // Enable Global interrupt INTM
     ERTM;  // Enable Global realtime interrupt DBGM
-// ----- code for CAN start here -----
+    // ----- code for CAN start here -----
     // Measured Distance from 1
     // Initialize the receive message object 1 used for receiving CAN messages.
     // Message Object Parameters:
@@ -568,7 +582,7 @@ void main(void)
     CanbRegs.CAN_CTL.bit.CCE = 0;
 
 
-// ----- code for CAN end here -----
+    // ----- code for CAN end here -----
     char S_command[19] = "S1152000124000\n";//this change the baud rate to 115200
     uint16_t S_len = 19;
     serial_sendSCIC(&SerialC, S_command, S_len);
@@ -596,13 +610,15 @@ void main(void)
         if (UARTPrint == 1 ) {
 
             if (readbuttons() == 0) {
-                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
-//                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
-                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
+                //                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
+                UART_printfLine(1,"RobotState:%.2f",RobotState);
+                //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
+                //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
+//                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
             } else if (readbuttons() == 1) {
                 UART_printfLine(1,"O1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold1,MaxColThreshold1,MaxRowThreshold1);
                 UART_printfLine(2,"P1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold2,MaxColThreshold2,MaxRowThreshold2);
-				//UART_printfLine(1,"LV1:%.3f LV2:%.3f",printLV1,printLV2);
+                //UART_printfLine(1,"LV1:%.3f LV2:%.3f",printLV1,printLV2);
                 //UART_printfLine(2,"Ln1:%.3f Ln2:%.3f",printLinux1,printLinux2);
             } else if (readbuttons() == 2) {
                 UART_printfLine(1,"O2A:%.0fC:%.0fR:%.0f",NextLargestAreaThreshold1,NextLargestColThreshold1,NextLargestRowThreshold1);
@@ -623,8 +639,8 @@ void main(void)
             } else if (readbuttons() == 5) {
                 UART_printfLine(1,"Ox:%.2f:Oy:%.2f:Oa%.2f",OPTITRACKps.x,OPTITRACKps.y,OPTITRACKps.theta);
                 UART_printfLine(2,"State:%d : %d",RobotState,statePos);
-			} else if (readbuttons() == 6) {
-				UART_printfLine(1,"D1 %ld D2 %ld",dis_1,dis_2);
+            } else if (readbuttons() == 6) {
+                UART_printfLine(1,"D1 %ld D2 %ld",dis_1,dis_2);
                 UART_printfLine(2,"St1 %ld St2 %ld",measure_status_1,measure_status_2);
             } else if (readbuttons() == 7) {
                 UART_printfLine(1,"%.0f,%.1f,%.1f,%.1f",tagid,tagx,tagy,tagz);
@@ -895,13 +911,13 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             NextNextLargestAreaThreshold1 = fromCAMvaluesThreshold1[6];
             NextNextLargestColThreshold1 = fromCAMvaluesThreshold1[7];
             NextNextLargestRowThreshold1 = fromCAMvaluesThreshold1[8];
-			numThres1++;
+            numThres1++;
             if ((numThres1 % 5) == 0) {
                 // LED4 is GPIO97
                 GpioDataRegs.GPDTOGGLE.bit.GPIO97 = 1;
             }			
         }
-
+        distToBall1 = cubeFit[0] * (MaxRowThreshold1 * MaxRowThreshold1 * MaxRowThreshold1) + cubeFit[1]* (MaxRowThreshold1 * MaxRowThreshold1) + cubeFit[2]* (MaxRowThreshold1) + cubeFit[3];
         if (NewCAMDataThreshold2 == 1) {
             NewCAMDataThreshold2 = 0;
             MaxAreaThreshold2 = fromCAMvaluesThreshold2[0];
@@ -915,13 +931,14 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             NextNextLargestAreaThreshold2 = fromCAMvaluesThreshold2[6];
             NextNextLargestColThreshold2 = fromCAMvaluesThreshold2[7];
             NextNextLargestRowThreshold2 = fromCAMvaluesThreshold2[8];
-			numThres2++;
-			if ((numThres2 % 5) == 0) {
+            numThres2++;
+            if ((numThres2 % 5) == 0) {
                 // LED5 is GPIO111
                 GpioDataRegs.GPDTOGGLE.bit.GPIO111 = 1;
             }			
         }
-		
+        distToBall2 = cubeFit[0]* (MaxRowThreshold2 * MaxRowThreshold2 * MaxRowThreshold2) + cubeFit[1]* (MaxRowThreshold2 * MaxRowThreshold2) + cubeFit[2]* (MaxRowThreshold2) + cubeFit[3];
+
         if (NewCAMDataAprilTag1 == 1) {
             NewCAMDataAprilTag1 = 0;
             tagx = fromCAMvaluesAprilTag1[0];
@@ -940,7 +957,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 GpioDataRegs.GPCTOGGLE.bit.GPIO94 = 1;
             }
         }
-		
+
         if (NewLVData == 1) {
             NewLVData = 0;
             printLV1 = fromLVvalues[0];
@@ -1013,6 +1030,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             statePos = (statePos+1)%NUMWAYPOINTS;
         }
         // state machine
+        //        RobotState = 20; //RSA aaaddded
         switch (RobotState) {
         case 1:
 
@@ -1028,6 +1046,18 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 }
             } else {
                 checkfronttally = 0;
+            }
+            count1++;
+
+            //RSA case switch 1 to 20 GREEN BALL
+            if (MaxAreaThreshold1 > MaxAreaThreshold2 && MaxAreaThreshold1 > 20 && count1 > 2000) {
+
+                RobotState = 20;
+            }
+//            RSA case switch 1 to 30 ORANGE BALL
+            if (MaxAreaThreshold2 > 20 && count1 > 2000) {
+
+                RobotState = 30;
             }
 
             break;
@@ -1063,7 +1093,134 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
         case 20:
             // put vision code here
+
+            //RSA was pseudo code
+            if (MaxColThreshold1 == 0 || MaxAreaThreshold1 < 3){
+                vref = 0;
+                turn = 0;
+            } else{
+                vref = 0.75;
+                colcentroid = MaxColThreshold1 - 80;
+                turn = kpvision * (0 - colcentroid);
+                // start kpvision out as 0.05 and kpvision could need to be negative
+            }
+
+            //RSA case witch 20 -> 22
+            if (MaxRowThreshold1 > 108) {
+                RobotState = 22;
+                count22 = 0;
+            }
+
+
             break;
+
+        case 22:
+
+            vref = 0;
+            turn = 0;
+
+            count22 += 1;
+
+            if (count22 >= 1000) {
+                count24 = 0;
+                RobotState = 24;
+            }
+
+            break;
+
+        case 24:
+
+            vref = 0.5;
+            turn = 0;
+
+            count24 += 1;
+
+            if (count24 >= 1000) {
+                count26 = 0;
+                RobotState = 26;
+            }
+
+            break;
+
+        case 26:
+
+            vref = 0;
+            turn = 0;
+
+            count26 += 1;
+
+            if (count26 >= 1000) {
+                count1 = 0;
+                RobotState = 1;
+            }
+
+            break;
+
+        case 30:
+                    // put vision code here
+
+                    //RSA was pseudo code
+                    if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
+                        vref = 0;
+                        turn = 0;
+                    } else{
+                        vref = 0.75;
+                        colcentroid = MaxColThreshold2 - 80;
+                        turn = kpvision * (0 - colcentroid);
+                        // start kpvision out as 0.05 and kpvision could need to be negative
+                    }
+
+                    //RSA case witch 20 -> 22
+                    if (MaxRowThreshold2 > 108) {
+                        RobotState = 32;
+                        count32 = 0;
+                    }
+
+
+                    break;
+
+                case 32:
+
+                    vref = 0;
+                    turn = 0;
+
+                    count32 += 1;
+
+                    if (count32 >= 1000) {
+                        count34 = 0;
+                        RobotState = 34;
+                    }
+
+                    break;
+
+                case 34:
+
+                    vref = 0.5;
+                    turn = 0;
+
+                    count34 += 1;
+
+                    if (count34 >= 1000) {
+                        count36 = 0;
+                        RobotState = 36;
+                    }
+
+                    break;
+
+                case 36:
+
+                    vref = 0;
+                    turn = 0;
+
+                    count36 += 1;
+
+                    if (count36 >= 1000) {
+                        count1 = 0;
+                        RobotState = 1;
+                    }
+
+                    break;
+
         default:
             break;
         }
