@@ -11,8 +11,8 @@ lcd = display.SPIDisplay()
 
 uart = pyb.UART(3)
 uart.init(115200, bits=8, parity=None)
-threshold1 = (27, 85, 21, 64, 11, 60) # change to a color threshold range
-threshold2 = (30, 75, 2, 40, -35, -11) # change to a color threshold range
+threshold1 = (40, 90, -59, -22, 5, 46) # change to a color threshold range
+threshold2 = (19, 100, 15, 59, 0, 44) # change to a color threshold range
 # Packets to Send
 blob_packet = '<fff'
 
@@ -55,8 +55,8 @@ while True:
     # y is rows.  w = width is postive to the right, h = height is positive down.
     # only pixels within the roi are processed.  So (0,60,160,60) only processes the bottom
     # half of the 160X120 image.  You can change this to process more or less of the image
-    blobs1 = img.find_blobs([threshold1], roi=(0,60,160,60), pixels_threshold=5, area_threshold=20)
-    blobs2 = img.find_blobs([threshold2], roi=(0,60,160,60), pixels_threshold=5, area_threshold=20)
+    blobs1 = img.find_blobs([threshold1], roi=(0,60,160,60), pixels_threshold=2, area_threshold=5)
+    blobs2 = img.find_blobs([threshold2], roi=(0,60,160,60), pixels_threshold=2, area_threshold=5)
 
     if blobs1:
         blob1_sort = sorted(blobs1, key = lambda b: b.pixels(), reverse=True)
