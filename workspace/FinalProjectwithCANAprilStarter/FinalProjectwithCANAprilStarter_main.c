@@ -291,6 +291,15 @@ int16_t count34 = 0;
 int16_t count36 = 0;
 
 
+//////////// Varun Mapping Code ///////////////////////
+int16_t currentLadar = 0;
+float labviewXObject = 0.0;
+float labviewYObject = 0.0;
+float LADARright = 0.0;
+int16_t usableLadar = 0;
+float LADARleft = 0.0;
+//////////// Varun Mapping Code ///////////////////////
+
 
 void main(void)
 {
@@ -614,7 +623,7 @@ void main(void)
                 UART_printfLine(1,"RobotState:%.2f",RobotState);
                 //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
                 //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
-//                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
+                //                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
             } else if (readbuttons() == 1) {
                 UART_printfLine(1,"O1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold1,MaxColThreshold1,MaxRowThreshold1);
                 UART_printfLine(2,"P1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold2,MaxColThreshold2,MaxRowThreshold2);
@@ -1030,7 +1039,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             statePos = (statePos+1)%NUMWAYPOINTS;
         }
         // state machine
-        //        RobotState = 20; //RSA aaaddded
+        //        RobotState = 20; //RSA addded
         switch (RobotState) {
         case 1:
 
@@ -1054,11 +1063,42 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
                 RobotState = 20;
             }
-//            RSA case switch 1 to 30 ORANGE BALL
+            //            RSA case switch 1 to 30 ORANGE BALL
             if (MaxAreaThreshold2 > 20 && count1 > 2000) {
 
                 RobotState = 30;
             }
+
+
+            ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
+            usableLadar = 0;
+            currentLadar++;
+
+            if ((currentLadar % 3) == 0) { // look at objects to the right
+                labviewXObject = ROBOTps.x + LADARright * cos(PI/2 - ROBOTps.theta);
+                labviewYObject = ROBOTps.y - LADARright * sin(PI/2 - ROBOTps.theta);
+                if (LADARright <= 2) {// mapping objects 2ft away
+                    usableLadar = 1;
+                }
+            }
+            if ((currentLadar % 3) == 1) { // look at objects in front
+                labviewXObject = ROBOTps.x + LADARfront * cos(ROBOTps.theta);
+                labviewYObject = ROBOTps.y +LADARfront * sin(ROBOTps.theta);
+                if (LADARfront <= 2) {// mapping objects 2ft away
+                    usableLadar = 1;
+                }
+            }
+            if ((currentLadar % 3) == 2) { // look at objects to the left
+                labviewXObject = ROBOTps.x - LADARleft * cos(PI/2 - ROBOTps.theta);
+                labviewYObject = ROBOTps.y + LADARleft * sin(PI/2 - ROBOTps.theta);
+                if (LADARleft <= 2) {// mapping objects 2ft away
+                    usableLadar = 1;
+                }
+            }
+
+
+
+            ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
 
             break;
         case 10:
@@ -1157,69 +1197,69 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             break;
 
         case 30:
-                    // put vision code here
+            // put vision code here
 
-                    //RSA was pseudo code
-                    if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
-                        vref = 0;
-                        turn = 0;
-                    } else{
-                        vref = 0.75;
-                        colcentroid = MaxColThreshold2 - 80;
-                        turn = kpvision * (0 - colcentroid);
-                        // start kpvision out as 0.05 and kpvision could need to be negative
-                    }
+            //RSA was pseudo code
+            if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
+                vref = 0;
+                turn = 0;
+            } else{
+                vref = 0.75;
+                colcentroid = MaxColThreshold2 - 80;
+                turn = kpvision * (0 - colcentroid);
+                // start kpvision out as 0.05 and kpvision could need to be negative
+            }
 
-                    //RSA case witch 20 -> 22
-                    if (MaxRowThreshold2 > 108) {
-                        RobotState = 32;
-                        count32 = 0;
-                    }
+            //RSA case witch 20 -> 22
+            if (MaxRowThreshold2 > 108) {
+                RobotState = 32;
+                count32 = 0;
+            }
 
 
-                    break;
+            break;
 
-                case 32:
+        case 32:
 
-                    vref = 0;
-                    turn = 0;
+            vref = 0;
+            turn = 0;
 
-                    count32 += 1;
+            count32 += 1;
 
-                    if (count32 >= 1000) {
-                        count34 = 0;
-                        RobotState = 34;
-                    }
+            if (count32 >= 1000) {
+                count34 = 0;
+                RobotState = 34;
+            }
 
-                    break;
+            break;
 
-                case 34:
+        case 34:
 
-                    vref = 0.5;
-                    turn = 0;
+            vref = 0.5;
+            turn = 0;
 
-                    count34 += 1;
+            count34 += 1;
 
-                    if (count34 >= 1000) {
-                        count36 = 0;
-                        RobotState = 36;
-                    }
+            if (count34 >= 1000) {
+                count36 = 0;
+                RobotState = 36;
+            }
 
-                    break;
+            break;
 
-                case 36:
+        case 36:
 
-                    vref = 0;
-                    turn = 0;
+            vref = 0;
+            turn = 0;
 
-                    count36 += 1;
+            count36 += 1;
 
-                    if (count36 >= 1000) {
-                        count1 = 0;
-                        RobotState = 1;
-                    }
+            if (count36 >= 1000) {
+                count1 = 0;
+                RobotState = 1;
+            }
 
-                    break;
+            break;
 
         default:
             break;
@@ -1236,12 +1276,14 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         LeftWheel_1 = LeftWheel;
         RightWheel_1 = RightWheel;
 
+
+        ////////// Varun changed values beign sent to labview ////////////////////
         if((timecount%250) == 0) {
             DataToLabView.floatData[0] = ROBOTps.x;
             DataToLabView.floatData[1] = ROBOTps.y;
-            DataToLabView.floatData[2] = ROBOTps.theta;
-            DataToLabView.floatData[3] = (float)timecount;
-            DataToLabView.floatData[4] = 0.5*(LeftVel + RightVel);
+            DataToLabView.floatData[2] = labviewXObject;
+            DataToLabView.floatData[3] = labviewYObject;
+            DataToLabView.floatData[4] = usableLadar;
             DataToLabView.floatData[5] = (float)RobotState;
             DataToLabView.floatData[6] = (float)statePos;
             DataToLabView.floatData[7] = LADARfront;
@@ -1307,6 +1349,24 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
     GpioDataRegs.GPATOGGLE.bit.GPIO22 = 1;
     if (LADARpingpong == 1) {
         // LADARrightfront is the min of dist 52, 53, 54, 55, 56
+        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        LADARright = 19; // 19 is greater than max feet
+        for (LADARi = 25; LADARi <= 30 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARright) {
+                LADARright = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+
+        LADARleft = 19; // 19 is greater than max feet
+        for (LADARi = 140; LADARi <= 145; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARleft) {
+                LADARleft = ladar_data[LADARi].distance_ping;
+            }
+        }
+        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+
+
         LADARrightfront = 19; // 19 is greater than max feet
         for (LADARi = 52; LADARi <= 56 ; LADARi++) {
             if (ladar_data[LADARi].distance_ping < LADARrightfront) {
