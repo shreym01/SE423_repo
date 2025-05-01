@@ -70,8 +70,8 @@ extern uint16_t rxMsgData[8];
 
 uint32_t dis_raw_1[2];
 uint32_t dis_raw_2[2];
-uint32_t dis_1 = 0;
-uint32_t dis_2 = 0;
+float dis_1 = 0;
+float dis_2 = 0;
 
 uint32_t quality_raw_1[4];
 uint32_t quality_raw_2[4];
@@ -640,7 +640,7 @@ void main(void)
                 UART_printfLine(1,"Ox:%.2f:Oy:%.2f:Oa%.2f",OPTITRACKps.x,OPTITRACKps.y,OPTITRACKps.theta);
                 UART_printfLine(2,"State:%d : %d",RobotState,statePos);
             } else if (readbuttons() == 6) {
-                UART_printfLine(1,"D1 %ld D2 %ld",dis_1,dis_2);
+                UART_printfLine(1,"D1 %.2f D2 %.2f",dis_1,dis_2);
                 UART_printfLine(2,"St1 %ld St2 %ld",measure_status_1,measure_status_2);
             } else if (readbuttons() == 7) {
                 UART_printfLine(1,"%.0f,%.1f,%.1f,%.1f",tagid,tagx,tagy,tagz);
@@ -1434,7 +1434,7 @@ __interrupt void can_isr(void)
             dis_raw_1[i] = rxMsgData[i];
         }
 
-        dis_1 = 256*dis_raw_1[1] + dis_raw_1[0];
+        dis_1 = (0.22/530)*(256*dis_raw_1[1] + dis_raw_1[0]);
 
         measure_status_1 = rxMsgData[2];
 
@@ -1470,7 +1470,7 @@ __interrupt void can_isr(void)
             dis_raw_2[i] = rxMsgData[i];
         }
 
-        dis_2 = 256*dis_raw_2[1] + dis_raw_2[0];
+        dis_2 = (0.22/530)*(256*dis_raw_2[1] + dis_raw_2[0]);
 
         measure_status_2 = rxMsgData[2];
 
