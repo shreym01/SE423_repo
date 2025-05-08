@@ -614,8 +614,8 @@ void main(void)
         if (UARTPrint == 1 ) {
 
             if (readbuttons() == 0) {
-                //                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
-                UART_printfLine(1,"RobotState:%.2f",RobotState);
+                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
+                //                UART_printfLine(1,"RobotState:%.2f",RobotState);
                 //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
                 //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
                 //                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
@@ -762,11 +762,11 @@ __interrupt void cpu_timer2_isr(void)
 
     CpuTimer2.InterruptCount++;
     RCangle = readEncWheel();
-    setEPWM3A_RCServo(RCangle);
-    setEPWM3B_RCServo(RCangle);
-    setEPWM5A_RCServo(RCangle);
-    setEPWM5B_RCServo(RCangle);
-    setEPWM6A_RCServo(RCangle);
+    //    setEPWM3A_RCServo(RCangle);
+    //    setEPWM3B_RCServo(RCangle);
+    //    setEPWM5A_RCServo(RCangle);
+    //    setEPWM5B_RCServo(RCangle); //RSA indexer
+    //    setEPWM6A_RCServo(RCangle); //RSA gate
     if ((CpuTimer2.InterruptCount % 10) == 0) {
         UARTPrint = 1;
     }
@@ -1036,7 +1036,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         // state machine
         //        RobotState = 20; //RSA aaaddded
         switch (RobotState) {
-        case 1:
+        case 1: //Move Forwards
 
             // vref and turn are the vref and turn returned from xy_control
 
@@ -1065,7 +1065,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
 
             break;
-        case 10:
+        case 10: //Wall Follow
             if (right_wall_follow_state == 1) {
                 //Left Turn
                 turn = Kp_front_wall*(14.5 - LADARfront);
@@ -1095,7 +1095,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
             break;
 
-        case 20:
+        case 20: //Green Ball Found
             // put vision code here
 
             //RSA was pseudo code
@@ -1112,14 +1112,18 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             //RSA case witch 20 -> 22
             if (MaxRowThreshold1 > 108) {
                 RobotState = 22;
+                //Change indexer to Green Ball side
+                setEPWM5B_RCServo(-49.0); //RSA indexer
+
+                //Open the gate servo
+                setEPWM6A_RCServo(23.0); //RSA gate
                 count22 = 0;
             }
 
 
             break;
 
-        case 22:
-
+        case 22: //Waiting for Servo Door
             vref = 0;
             turn = 0;
 
@@ -1127,15 +1131,12 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count22 >= 1000) {
                 count24 = 0;
-                //TODO
-                //Change indexer to Green Ball side
-                //Open the gate servo
                 RobotState = 24;
             }
 
             break;
 
-        case 24:
+        case 24: //Collect Ball
 
             vref = 0.5;
             turn = 0;
@@ -1144,12 +1145,15 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count24 >= 1000) {
                 count26 = 0;
+
+                //Close gate servo
+                setEPWM6A_RCServo(90.0); //RSA gate
                 RobotState = 26;
             }
 
             break;
 
-        case 26:
+        case 26: //Wait to Close Servo Door
 
             vref = 0;
             turn = 0;
@@ -1158,14 +1162,12 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count26 >= 1000) {
                 count1 = 0;
-                //TODO
-                //Close gate servo
                 RobotState = 1;
             }
 
             break;
 
-        case 30:
+        case 30: //ORANGE for the rest
             // put vision code here
 
             //RSA was pseudo code
@@ -1182,6 +1184,11 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             //RSA case witch 20 -> 22
             if (MaxRowThreshold2 > 108) {
                 RobotState = 32;
+                //Change indexer to ORANGE Ball side
+                setEPWM5B_RCServo(23.0); //RSA indexer
+
+                //Open the gate servo
+                setEPWM6A_RCServo(23.0); //RSA gate
                 count32 = 0;
             }
 
