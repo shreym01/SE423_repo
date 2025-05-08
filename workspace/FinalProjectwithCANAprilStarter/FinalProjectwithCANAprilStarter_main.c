@@ -126,6 +126,7 @@ extern float fromCAMvaluesThreshold2[CAMNUM_FROM_FLOATS];
 extern uint16_t NewCAMDataAprilTag1;  // Flag new data
 extern float fromCAMvaluesAprilTag1[CAMNUM_FROM_FLOATS];
 
+//April Tag Items
 float tagid = 0;
 float tagx = 0;
 float tagy = 0;
@@ -442,6 +443,9 @@ void main(void)
     //EPwm4Regs.TBCTL.bit.CTRMODE = 0; //unfreeze,  wait to do this right before enabling interrupts
     EDIS;
 
+    //TODO
+    //Include Servo Setup from lab 6? For the two servo motors (3 for index, 4 for opening)
+
     // Enable CPU int1 which is connected to CPU-Timer 0, CPU int13
     // which is connected to CPU-Timer 1, and CPU int 14, which is connected
     // to CPU-Timer 2:  int 12 is for the SWI.  
@@ -610,11 +614,11 @@ void main(void)
         if (UARTPrint == 1 ) {
 
             if (readbuttons() == 0) {
-                //                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
-                UART_printfLine(1,"RobotState:%.2f",RobotState);
+                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
+                //                UART_printfLine(1,"RobotState:%.2f",RobotState);
                 //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
                 //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
-//                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
+                //                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
             } else if (readbuttons() == 1) {
                 UART_printfLine(1,"O1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold1,MaxColThreshold1,MaxRowThreshold1);
                 UART_printfLine(2,"P1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold2,MaxColThreshold2,MaxRowThreshold2);
@@ -758,11 +762,11 @@ __interrupt void cpu_timer2_isr(void)
 
     CpuTimer2.InterruptCount++;
     RCangle = readEncWheel();
-    setEPWM3A_RCServo(RCangle);
-    setEPWM3B_RCServo(RCangle);
-    setEPWM5A_RCServo(RCangle);
-    setEPWM5B_RCServo(RCangle);
-    setEPWM6A_RCServo(RCangle);
+    //    setEPWM3A_RCServo(RCangle);
+    //    setEPWM3B_RCServo(RCangle);
+    //    setEPWM5A_RCServo(RCangle);
+    //    setEPWM5B_RCServo(RCangle); //RSA indexer
+    //    setEPWM6A_RCServo(RCangle); //RSA gate
     if ((CpuTimer2.InterruptCount % 10) == 0) {
         UARTPrint = 1;
     }
@@ -1032,7 +1036,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         // state machine
         //        RobotState = 20; //RSA aaaddded
         switch (RobotState) {
-        case 1:
+        case 1: //Move Forwards
 
             // vref and turn are the vref and turn returned from xy_control
 
@@ -1054,14 +1058,14 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
                 RobotState = 20;
             }
-//            RSA case switch 1 to 30 ORANGE BALL
+            //            RSA case switch 1 to 30 ORANGE BALL
             if (MaxAreaThreshold2 > 20 && count1 > 2000) {
 
                 RobotState = 30;
             }
 
             break;
-        case 10:
+        case 10: //Wall Follow
             if (right_wall_follow_state == 1) {
                 //Left Turn
                 turn = Kp_front_wall*(14.5 - LADARfront);
@@ -1091,7 +1095,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
             break;
 
-        case 20:
+        case 20: //Green Ball Found
             // put vision code here
 
             //RSA was pseudo code
@@ -1108,14 +1112,18 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             //RSA case witch 20 -> 22
             if (MaxRowThreshold1 > 108) {
                 RobotState = 22;
+                //Change indexer to Green Ball side
+                setEPWM5B_RCServo(-49.0); //RSA indexer
+
+                //Open the gate servo
+                setEPWM6A_RCServo(23.0); //RSA gate
                 count22 = 0;
             }
 
 
             break;
 
-        case 22:
-
+        case 22: //Waiting for Servo Door
             vref = 0;
             turn = 0;
 
@@ -1128,7 +1136,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             break;
 
-        case 24:
+        case 24: //Collect Ball
 
             vref = 0.5;
             turn = 0;
@@ -1137,12 +1145,15 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count24 >= 1000) {
                 count26 = 0;
+
+                //Close gate servo
+                setEPWM6A_RCServo(90.0); //RSA gate
                 RobotState = 26;
             }
 
             break;
 
-        case 26:
+        case 26: //Wait to Close Servo Door
 
             vref = 0;
             turn = 0;
@@ -1156,70 +1167,80 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             break;
 
-        case 30:
-                    // put vision code here
+        case 30: //ORANGE for the rest
+            // put vision code here
 
-                    //RSA was pseudo code
-                    if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
-                        vref = 0;
-                        turn = 0;
-                    } else{
-                        vref = 0.75;
-                        colcentroid = MaxColThreshold2 - 80;
-                        turn = kpvision * (0 - colcentroid);
-                        // start kpvision out as 0.05 and kpvision could need to be negative
-                    }
+            //RSA was pseudo code
+            if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
+                vref = 0;
+                turn = 0;
+            } else{
+                vref = 0.75;
+                colcentroid = MaxColThreshold2 - 80;
+                turn = kpvision * (0 - colcentroid);
+                // start kpvision out as 0.05 and kpvision could need to be negative
+            }
 
-                    //RSA case witch 20 -> 22
-                    if (MaxRowThreshold2 > 108) {
-                        RobotState = 32;
-                        count32 = 0;
-                    }
+            //RSA case witch 20 -> 22
+            if (MaxRowThreshold2 > 108) {
+                RobotState = 32;
+                //Change indexer to ORANGE Ball side
+                setEPWM5B_RCServo(23.0); //RSA indexer
+
+                //Open the gate servo
+                setEPWM6A_RCServo(23.0); //RSA gate
+                count32 = 0;
+            }
 
 
-                    break;
+            break;
 
-                case 32:
+        case 32:
 
-                    vref = 0;
-                    turn = 0;
+            vref = 0;
+            turn = 0;
 
-                    count32 += 1;
+            count32 += 1;
 
-                    if (count32 >= 1000) {
-                        count34 = 0;
-                        RobotState = 34;
-                    }
+            if (count32 >= 1000) {
+                count34 = 0;
+                //TODO
+                //Change indexer to Green Ball side
+                //Open the gate servo
+                RobotState = 34;
+            }
 
-                    break;
+            break;
 
-                case 34:
+        case 34:
 
-                    vref = 0.5;
-                    turn = 0;
+            vref = 0.5;
+            turn = 0;
 
-                    count34 += 1;
+            count34 += 1;
 
-                    if (count34 >= 1000) {
-                        count36 = 0;
-                        RobotState = 36;
-                    }
+            if (count34 >= 1000) {
+                count36 = 0;
+                RobotState = 36;
+            }
 
-                    break;
+            break;
 
-                case 36:
+        case 36:
 
-                    vref = 0;
-                    turn = 0;
+            vref = 0;
+            turn = 0;
 
-                    count36 += 1;
+            count36 += 1;
 
-                    if (count36 >= 1000) {
-                        count1 = 0;
-                        RobotState = 1;
-                    }
+            if (count36 >= 1000) {
+                count1 = 0;
+                //TODO
+                //Close gate servo
+                RobotState = 1;
+            }
 
-                    break;
+            break;
 
         default:
             break;
