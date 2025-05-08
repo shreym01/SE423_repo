@@ -614,7 +614,10 @@ void main(void)
         if (UARTPrint == 1 ) {
 
             if (readbuttons() == 0) {
-                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
+
+                UART_printfLine(1,"tagx:%.2f tagid:%.2f",tagx,tagid);
+
+                //UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
                 //                UART_printfLine(1,"RobotState:%.2f",RobotState);
                 //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
                 //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
@@ -943,6 +946,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         }
         distToBall2 = cubeFit[0]* (MaxRowThreshold2 * MaxRowThreshold2 * MaxRowThreshold2) + cubeFit[1]* (MaxRowThreshold2 * MaxRowThreshold2) + cubeFit[2]* (MaxRowThreshold2) + cubeFit[3];
 
+        //RSA GIVEN APRIL TAG CODE
         if (NewCAMDataAprilTag1 == 1) {
             NewCAMDataAprilTag1 = 0;
             tagx = fromCAMvaluesAprilTag1[0];
@@ -1221,6 +1225,9 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count34 >= 1000) {
                 count36 = 0;
+
+                setEPWM6A_RCServo(90.0); //RSA gate CCloses
+
                 RobotState = 36;
             }
 
@@ -1241,6 +1248,99 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
 
             break;
+
+
+            //RSA ON APRIL TAGS
+            //rSA :: MAKE SURE     runtag = 1 #set this to 1 if you want to look for april tags ::: IN OPENMV main.py
+
+            //RSA TODO FIX for drop off not pick up balls
+            //      Also implement to pick ball size by ID
+        case 40: //TAG Found
+            // put vision code here
+
+            //RSA was pseudo code
+            if (MaxColThreshold1 == 0 || MaxAreaThreshold1 < 3){
+                vref = 0;
+                turn = 0;
+            } else{
+                vref = 0.75;
+                colcentroid = tagx - 80;
+                turn = kpvision * (0 - colcentroid);
+                // start kpvision out as 0.05 and kpvision could need to be negative
+            }
+
+
+
+            //RSA case witch 20 -> 22
+            if (MaxRowThreshold1 > 108) {
+                RobotState = 22;
+                //Change indexer to Green Ball side
+
+                //TODO CHANGE INDEXER FOR BALL BY TAGID (CHECK DOUBLE CHECK TAGIDs WE're Usingn)
+                if (tagid == 4) { //GREEN
+                    setEPWM5B_RCServo(-49.0); //RSA indexer (Green -49)
+
+                } else if (tagid == 5) { //ORANG
+                    setEPWM5B_RCServo(23.0); //RSA indexer ( oraneg =23 )
+
+                }
+
+                //Open the gate servo
+                setEPWM6A_RCServo(23.0); //RSA gate
+                count22 = 0;
+            }
+
+
+            break;
+
+        case 42: //Waiting for Servo Door
+            vref = 0;
+            turn = 0;
+
+            count22 += 1;
+
+            if (count22 >= 1000) {
+                count24 = 0;
+                RobotState = 24;
+            }
+
+            break;
+
+        case 44: //move to drop off
+
+            vref = 0.5;
+            turn = 0;
+
+            count24 += 1;
+
+            if (count24 >= 1000) {
+                count26 = 0;
+
+
+                RobotState = 26;
+            }
+
+            break;
+
+        case 46: //BACK UP :: then (?) Wait to Close Servo Door (?)
+
+            vref = -0.75;
+            //vref = 0;
+            turn = 0;
+
+            count26 += 1;
+
+            if (count26 >= 1000) {
+                count1 = 0;
+                //Close gate servo
+                setEPWM6A_RCServo(90.0); //RSA gate
+                RobotState = 1;
+            }
+
+            break;
+
+
+
 
         default:
             break;
