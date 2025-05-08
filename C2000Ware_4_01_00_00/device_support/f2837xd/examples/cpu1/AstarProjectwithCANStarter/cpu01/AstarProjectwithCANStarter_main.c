@@ -659,7 +659,7 @@ void main(void)
 
             if (readbuttons() == 0) {
                 UART_printfLine(1,"Vrf:%.2f trn:%.2f",vref,turn);
-                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
+                UART_printfLine(2,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
             } else if (readbuttons() == 1) {
                 UART_printfLine(1,"O1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold1,MaxColThreshold1,MaxRowThreshold1);
                 UART_printfLine(2,"P1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold2,MaxColThreshold2,MaxRowThreshold2);
@@ -903,7 +903,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         if (AstarDelay == 1000) {
             StartAstar = 1;  // First Astar to get first path.
             AstarDelay++;
-        } else {
+        } else if (AstarDelay < 1000) {
             AstarDelay++;
         }
 
