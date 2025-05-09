@@ -178,11 +178,11 @@ pose robotdest[NUMWAYPOINTS];  // array of waypoints for the robot
 uint16_t i = 0;//for loop
 
 uint16_t right_wall_follow_state = 2;  // right follow
-float Kp_front_wall = -2.0;
+float Kp_front_wall = -1.6; // -1.6 VVMZ /////////////////////////////
 float front_turn_velocity = 0.2;
 float left_turn_Stop_threshold = 3.5;
 float Kp_right_wal = -4.0;
-float ref_right_wall = 1.1;
+float ref_right_wall = 1.1; // 1.1
 float foward_velocity = 1.0;
 float left_turn_Start_threshold = 1.3;
 float turn_saturation = 2.5;
@@ -291,24 +291,25 @@ int16_t count34 = 0;
 int16_t count36 = 0;
 
 
-//////////// Varun Mapping Code ///////////////////////
+//////////// VVMZ Mapping Code ///////////////////////
 int16_t currentLadar = 0;
 float labviewXObject = 0.0;
 float labviewYObject = 0.0;
 float LADARright = 0.0;
 int16_t usableLadar = 0;
 float LADARleft = 0.0;
-//////////// Varun Mapping Code ///////////////////////
+//////////// VVMZ Mapping Code ///////////////////////
 
-///////////// Varun Left wall following code ////////////
+///////////// VVMZ Left wall following code ////////////
 float left_wall_follow_state = 2;
-float Kp_left_wal = 4.0;
-float ref_left_wall = 1.1;
-float right_turn_Stop_threshold = 3.5;
-float right_turn_Start_threshold = 1.3;
+float Kp_left_wal = -0.9;
+float ref_left_wall = 1.6;
+float right_turn_Stop_threshold = 4.5;
+float right_turn_Start_threshold = 2.0;
 float LADARleftfront = 0.0;
+float LADARleftback = 0.0;
 
-/////////////Varun Left Wall following ////////////////////////////
+/////////////VVMZ Left Wall following ////////////////////////////
 
 
 void main(void)
@@ -630,7 +631,8 @@ void main(void)
 
             if (readbuttons() == 0) {
                 //                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
-                UART_printfLine(1,"RobotState:%.2f",RobotState);
+                UART_printfLine(1,"case:%d", RobotState);
+
                 //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
                 //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
                 //                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
@@ -934,7 +936,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             if ((numThres1 % 5) == 0) {
                 // LED4 is GPIO97
                 GpioDataRegs.GPDTOGGLE.bit.GPIO97 = 1;
-            }			
+            }
         }
         distToBall1 = cubeFit[0] * (MaxRowThreshold1 * MaxRowThreshold1 * MaxRowThreshold1) + cubeFit[1]* (MaxRowThreshold1 * MaxRowThreshold1) + cubeFit[2]* (MaxRowThreshold1) + cubeFit[3];
         if (NewCAMDataThreshold2 == 1) {
@@ -954,7 +956,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             if ((numThres2 % 5) == 0) {
                 // LED5 is GPIO111
                 GpioDataRegs.GPDTOGGLE.bit.GPIO111 = 1;
-            }			
+            }
         }
         distToBall2 = cubeFit[0]* (MaxRowThreshold2 * MaxRowThreshold2 * MaxRowThreshold2) + cubeFit[1]* (MaxRowThreshold2 * MaxRowThreshold2) + cubeFit[2]* (MaxRowThreshold2) + cubeFit[3];
 
@@ -1055,14 +1057,20 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             // vref and turn are the vref and turn returned from xy_control
 
-            if (LADARfront < 1.2) {
+            if (LADARfront < 1.5) { /////// VVMZ changed from 1.2
                 vref = 0.2;
                 checkfronttally++;
                 if (checkfronttally > 310) { // check if LADARfront < 1.2 for 310ms or 3 LADAR samples
-                    RobotState = 10; // Wall follow
                     WallFollowtime = 0;
-                    //                    right_wall_follow_state = 1;
-                    left_wall_follow_state = 1;
+                    if (LADARleftfront >= LADARrightfront) {
+                        right_wall_follow_state = 1;
+                        RobotState = 10;
+                    }
+                    else {
+                        left_wall_follow_state = 1;
+                        RobotState = 11;
+                    }
+
                 }
             } else {
                 checkfronttally = 0;
@@ -1081,71 +1089,54 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
 
 
-            ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
+            ///////////// VVMZ LADAR mapping /////////////////////////////////////////////////////
             usableLadar = 0;
             currentLadar++;
 
             if ((currentLadar % 3) == 0) { // look at objects to the right
                 labviewXObject = ROBOTps.x + LADARright * cos(PI/2 - ROBOTps.theta);
                 labviewYObject = ROBOTps.y - LADARright * sin(PI/2 - ROBOTps.theta);
-                if (LADARright <= 2) {// mapping objects 2ft away
+                if (LADARright <= 3) {// mapping objects 2ft away
                     usableLadar = 1;
                 }
             }
-            if ((currentLadar % 3) == 1) { // look at objects in front
-                labviewXObject = ROBOTps.x + LADARfront * cos(ROBOTps.theta);
-                labviewYObject = ROBOTps.y +LADARfront * sin(ROBOTps.theta);
-                if (LADARfront <= 2) {// mapping objects 2ft away
-                    usableLadar = 1;
-                }
-            }
-            if ((currentLadar % 3) == 2) { // look at objects to the left
+//            if ((currentLadar % 3) == 1) { // look at objects in front
+//                labviewXObject = ROBOTps.x + LADARfront * cos(ROBOTps.theta);
+//                labviewYObject = ROBOTps.y +LADARfront * sin(ROBOTps.theta);
+//                if (LADARfront <= 3) {// mapping objects 2ft away
+//                    usableLadar = 1;
+//                }
+//            }
+            else //((currentLadar % 3) == 2) { // look at objects to the left
+            {
                 labviewXObject = ROBOTps.x - LADARleft * cos(PI/2 - ROBOTps.theta);
                 labviewYObject = ROBOTps.y + LADARleft * sin(PI/2 - ROBOTps.theta);
-                if (LADARleft <= 2) {// mapping objects 2ft away
+                if (LADARleft <= 3) {// mapping objects 2ft away
                     usableLadar = 1;
                 }
             }
 
 
 
-            ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
+            ///////////// VVMZ LADAR mapping /////////////////////////////////////////////////////
 
             break;
         case 10:
-            //            if (right_wall_follow_state == 1) {
-            //                //Left Turn
-            //                turn = Kp_front_wall*(14.5 - LADARfront);
-            //                vref = front_turn_velocity;
-            //                if (LADARfront > left_turn_Stop_threshold) {
-            //                    right_wall_follow_state = 2;
-            //                }
-            //            } else if (right_wall_follow_state == 2) {
-            //                //Right Wall Follow
-            //                turn = Kp_right_wal*(ref_right_wall - LADARrightfront);
-            //                vref = foward_velocity;
-            //                if (LADARfront < left_turn_Start_threshold) {
-            //                    right_wall_follow_state = 1;
-            //                }
-            //            }
-            ///////// Varun adding left wall following ////////////////
-
-            if (left_wall_follow_state == 1) {
-                turn = -Kp_front_wall * (14.5 - LADARfront);
+            if (right_wall_follow_state == 1) {
+                //Left Turn
+                turn = Kp_front_wall*(14.5 - LADARfront);
                 vref = front_turn_velocity;
-                if (LADARfront > right_turn_Stop_threshold) {
-                    left_wall_follow_state = 2;
+                if (LADARfront > left_turn_Stop_threshold) {
+                    right_wall_follow_state = 2;
                 }
-            }
-            else if (left_wall_follow_state == 2) {
-                turn = Kp_left_wal * (ref_left_wall - LADARleft);
+            } else if (right_wall_follow_state == 2) {
+                //Right Wall Follow
+                turn = Kp_right_wal*(ref_right_wall - LADARrightfront);
                 vref = foward_velocity;
-                if (LADARfront < right_turn_Start_threshold) {
-                    left_wall_follow_state = 1;
+                if (LADARfront < left_turn_Start_threshold) {
+                    right_wall_follow_state = 1;
                 }
             }
-
-            //////////////Varun left wall following /////////////////
 
 
             if (turn > turn_saturation) {
@@ -1162,133 +1153,177 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
             break;
 
+
+        case 11:
+            /////// VVMZ adding left wall following ////////////////
+
+            if (left_wall_follow_state == 1) {
+                turn = -Kp_front_wall * (14.5 - LADARfront);
+                vref = front_turn_velocity;
+                if (LADARfront > right_turn_Stop_threshold) {
+                    left_wall_follow_state = 2;
+                }
+            }
+            else if (left_wall_follow_state == 2) {
+                turn = -Kp_left_wal * (ref_left_wall - LADARleftfront);
+                vref = foward_velocity;
+                if (LADARfront < right_turn_Start_threshold) {
+                    left_wall_follow_state = 1;
+                }
+                if (LADARleftfront > 2.5){
+                    if (LADARleftback < 1.0) {
+                        turn = Kp_left_wal*(ref_left_wall - LADARleftback);
+                    }
+                }
+            }
+
+            //////////////VVMZ left wall following /////////////////
+
+
+            if (turn > turn_saturation) {
+                turn = turn_saturation;
+            }
+            if (turn < -turn_saturation) {
+                turn = -turn_saturation;
+            }
+
+            WallFollowtime++;
+            if ( (WallFollowtime > 6000) && (LADARfront > 1.5) ) { // VVMZ made from 5-6000 cycles
+                RobotState = 1;
+                checkfronttally = 0;
+            }
+            break;
+
         case 20:
-            // put vision code here
-
-            //RSA was pseudo code
-            if (MaxColThreshold1 == 0 || MaxAreaThreshold1 < 3){
-                vref = 0;
-                turn = 0;
-            } else{
-                vref = 0.75;
-                colcentroid = MaxColThreshold1 - 80;
-                turn = kpvision * (0 - colcentroid);
-                // start kpvision out as 0.05 and kpvision could need to be negative
-            }
-
-            //RSA case witch 20 -> 22
-            if (MaxRowThreshold1 > 108) {
-                RobotState = 22;
-                count22 = 0;
-            }
-
+            RobotState = 1;
+//            // put vision code here
+//
+//            //RSA was pseudo code
+//            if (MaxColThreshold1 == 0 || MaxAreaThreshold1 < 3){
+//                vref = 0;
+//                turn = 0;
+//            } else{
+//                vref = 0.75;
+//                colcentroid = MaxColThreshold1 - 80;
+//                turn = kpvision * (0 - colcentroid);
+//                // start kpvision out as 0.05 and kpvision could need to be negative
+//            }
+//
+//            //RSA case witch 20 -> 22
+//            if (MaxRowThreshold1 > 108) {
+//                RobotState = 22;
+//                count22 = 0;
+//            }
+//
 
             break;
 
         case 22:
-
-            vref = 0;
-            turn = 0;
-
-            count22 += 1;
-
-            if (count22 >= 1000) {
-                count24 = 0;
-                RobotState = 24;
-            }
-
+            RobotState = 1;
+//            vref = 0;
+//            turn = 0;
+//
+//            count22 += 1;
+//
+//            if (count22 >= 1000) {
+//                count24 = 0;
+//                RobotState = 24;
+//            }
+//
             break;
 
         case 24:
 
-            vref = 0.5;
-            turn = 0;
+            RobotState = 1;
 
-            count24 += 1;
-
-            if (count24 >= 1000) {
-                count26 = 0;
-                RobotState = 26;
-            }
-
+//            vref = 0.5;
+//            turn = 0;
+//
+//            count24 += 1;
+//
+//            if (count24 >= 1000) {
+//                count26 = 0;
+//                RobotState = 26;
+//            }
+//
             break;
 
         case 26:
-
-            vref = 0;
-            turn = 0;
-
-            count26 += 1;
-
-            if (count26 >= 1000) {
-                count1 = 0;
-                RobotState = 1;
-            }
+            RobotState = 1;
+//            vref = 0;
+//            turn = 0;
+//
+//            count26 += 1;
+//
+//            if (count26 >= 1000) {
+//                count1 = 0;
+//                RobotState = 1;
+//            }
 
             break;
 
         case 30:
             // put vision code here
-
-            //RSA was pseudo code
-            if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
-                vref = 0;
-                turn = 0;
-            } else{
-                vref = 0.75;
-                colcentroid = MaxColThreshold2 - 80;
-                turn = kpvision * (0 - colcentroid);
-                // start kpvision out as 0.05 and kpvision could need to be negative
-            }
-
-            //RSA case witch 20 -> 22
-            if (MaxRowThreshold2 > 108) {
-                RobotState = 32;
-                count32 = 0;
-            }
+            RobotState = 1;
+//            //RSA was pseudo code
+//            if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
+//                vref = 0;
+//                turn = 0;
+//            } else{
+//                vref = 0.75;
+//                colcentroid = MaxColThreshold2 - 80;
+//                turn = kpvision * (0 - colcentroid);
+//                // start kpvision out as 0.05 and kpvision could need to be negative
+//            }
+//
+//            //RSA case witch 20 -> 22
+//            if (MaxRowThreshold2 > 108) {
+//                RobotState = 32;
+//                count32 = 0;
+//            }
 
 
             break;
 
         case 32:
-
-            vref = 0;
-            turn = 0;
-
-            count32 += 1;
-
-            if (count32 >= 1000) {
-                count34 = 0;
-                RobotState = 34;
-            }
+            RobotState = 1;
+//            vref = 0;
+//            turn = 0;
+//
+//            count32 += 1;
+//
+//            if (count32 >= 1000) {
+//                count34 = 0;
+//                RobotState = 34;
+//            }
 
             break;
 
         case 34:
-
-            vref = 0.5;
-            turn = 0;
-
-            count34 += 1;
-
-            if (count34 >= 1000) {
-                count36 = 0;
-                RobotState = 36;
-            }
+            RobotState = 1;
+//            vref = 0.5;
+//            turn = 0;
+//
+//            count34 += 1;
+//
+//            if (count34 >= 1000) {
+//                count36 = 0;
+//                RobotState = 36;
+//            }
 
             break;
 
         case 36:
-
-            vref = 0;
-            turn = 0;
-
-            count36 += 1;
-
-            if (count36 >= 1000) {
-                count1 = 0;
-                RobotState = 1;
-            }
+            RobotState = 1;
+//            vref = 0;
+//            turn = 0;
+//
+//            count36 += 1;
+//
+//            if (count36 >= 1000) {
+//                count1 = 0;
+//                RobotState = 1;
+//            }
 
             break;
 
@@ -1308,7 +1343,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         RightWheel_1 = RightWheel;
 
 
-        ////////// Varun changed values beign sent to labview ////////////////////
+        ////////// VVMZ changed values beign sent to labview ////////////////////
         if((timecount%250) == 0) {
             DataToLabView.floatData[0] = ROBOTps.x;
             DataToLabView.floatData[1] = ROBOTps.y;
@@ -1380,7 +1415,7 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
     GpioDataRegs.GPATOGGLE.bit.GPIO22 = 1;
     if (LADARpingpong == 1) {
         // LADARrightfront is the min of dist 52, 53, 54, 55, 56
-        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        ///////////// VVMZ Ladar Labview //////////////////////////////////////////////////
         LADARright = 19; // 19 is greater than max feet
         for (LADARi = 26; LADARi <= 30 ; LADARi++) {
             if (ladar_data[LADARi].distance_ping < LADARright) {
@@ -1403,7 +1438,14 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
             }
         }
 
-        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        LADARleftback = 19;
+        for (LADARi = 215; LADARi <= 219 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARleftback) {
+                LADARleftback = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+        ///////////// VVMZ Ladar Labview //////////////////////////////////////////////////
 
 
         LADARrightfront = 19; // 19 is greater than max feet
@@ -1443,30 +1485,37 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
             }
         }
 
-        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        ///////////// VVMZ Ladar Labview //////////////////////////////////////////////////
         LADARright = 19; // 19 is greater than max feet
         for (LADARi = 26; LADARi <= 30 ; LADARi++) {
-            if (ladar_data[LADARi].distance_ping < LADARright) {
-                LADARright = ladar_data[LADARi].distance_ping;
+            if (ladar_data[LADARi].distance_pong < LADARright) {
+                LADARright = ladar_data[LADARi].distance_pong;
             }
         }
 
 
         LADARleft = 19; // 19 is greater than max feet
         for (LADARi = 198; LADARi <= 202; LADARi++) {
-            if (ladar_data[LADARi].distance_ping < LADARleft) {
-                LADARleft = ladar_data[LADARi].distance_ping;
+            if (ladar_data[LADARi].distance_pong < LADARleft) {
+                LADARleft = ladar_data[LADARi].distance_pong;
             }
         }
 
         LADARleftfront = 19;
         for (LADARi = 170; LADARi <= 174 ; LADARi++) {
-            if (ladar_data[LADARi].distance_ping < LADARleftfront) {
-                LADARleftfront = ladar_data[LADARi].distance_ping;
+            if (ladar_data[LADARi].distance_pong < LADARleftfront) {
+                LADARleftfront = ladar_data[LADARi].distance_pong;
             }
         }
 
-        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        LADARleftback = 19;
+        for (LADARi = 215; LADARi <= 219 ; LADARi++) {
+            if (ladar_data[LADARi].distance_pong < LADARleftback) {
+                LADARleftback = ladar_data[LADARi].distance_pong;
+            }
+        }
+
+        ///////////// VVMZ Ladar Labview //////////////////////////////////////////////////
 
         LADARxoffset = ROBOTps.x + (LADARps.x*cosf(ROBOTps.theta)-LADARps.y*sinf(ROBOTps.theta - PI/2.0));
         LADARyoffset = ROBOTps.y + (LADARps.x*sinf(ROBOTps.theta)-LADARps.y*cosf(ROBOTps.theta - PI/2.0));
