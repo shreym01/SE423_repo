@@ -300,6 +300,16 @@ int16_t usableLadar = 0;
 float LADARleft = 0.0;
 //////////// Varun Mapping Code ///////////////////////
 
+///////////// Varun Left wall following code ////////////
+float left_wall_follow_state = 2;
+float Kp_left_wal = 4.0;
+float ref_left_wall = 1.1;
+float right_turn_Stop_threshold = 3.5;
+float right_turn_Start_threshold = 1.3;
+float LADARleftfront = 0.0;
+
+/////////////Varun Left Wall following ////////////////////////////
+
 
 void main(void)
 {
@@ -1051,7 +1061,8 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 if (checkfronttally > 310) { // check if LADARfront < 1.2 for 310ms or 3 LADAR samples
                     RobotState = 10; // Wall follow
                     WallFollowtime = 0;
-                    right_wall_follow_state = 1;
+                    //                    right_wall_follow_state = 1;
+                    left_wall_follow_state = 1;
                 }
             } else {
                 checkfronttally = 0;
@@ -1102,21 +1113,41 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             break;
         case 10:
-            if (right_wall_follow_state == 1) {
-                //Left Turn
-                turn = Kp_front_wall*(14.5 - LADARfront);
+            //            if (right_wall_follow_state == 1) {
+            //                //Left Turn
+            //                turn = Kp_front_wall*(14.5 - LADARfront);
+            //                vref = front_turn_velocity;
+            //                if (LADARfront > left_turn_Stop_threshold) {
+            //                    right_wall_follow_state = 2;
+            //                }
+            //            } else if (right_wall_follow_state == 2) {
+            //                //Right Wall Follow
+            //                turn = Kp_right_wal*(ref_right_wall - LADARrightfront);
+            //                vref = foward_velocity;
+            //                if (LADARfront < left_turn_Start_threshold) {
+            //                    right_wall_follow_state = 1;
+            //                }
+            //            }
+            ///////// Varun adding left wall following ////////////////
+
+            if (left_wall_follow_state == 1) {
+                turn = -Kp_front_wall * (14.5 - LADARfront);
                 vref = front_turn_velocity;
-                if (LADARfront > left_turn_Stop_threshold) {
-                    right_wall_follow_state = 2;
-                }
-            } else if (right_wall_follow_state == 2) {
-                //Right Wall Follow
-                turn = Kp_right_wal*(ref_right_wall - LADARrightfront);
-                vref = foward_velocity;
-                if (LADARfront < left_turn_Start_threshold) {
-                    right_wall_follow_state = 1;
+                if (LADARfront > right_turn_Stop_threshold) {
+                    left_wall_follow_state = 2;
                 }
             }
+            else if (left_wall_follow_state == 2) {
+                turn = Kp_left_wal * (ref_left_wall - LADARleft);
+                vref = foward_velocity;
+                if (LADARfront < right_turn_Start_threshold) {
+                    left_wall_follow_state = 1;
+                }
+            }
+
+            //////////////Varun left wall following /////////////////
+
+
             if (turn > turn_saturation) {
                 turn = turn_saturation;
             }
@@ -1351,7 +1382,7 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
         // LADARrightfront is the min of dist 52, 53, 54, 55, 56
         ///////////// Varun Ladar Labview //////////////////////////////////////////////////
         LADARright = 19; // 19 is greater than max feet
-        for (LADARi = 25; LADARi <= 30 ; LADARi++) {
+        for (LADARi = 26; LADARi <= 30 ; LADARi++) {
             if (ladar_data[LADARi].distance_ping < LADARright) {
                 LADARright = ladar_data[LADARi].distance_ping;
             }
@@ -1359,11 +1390,19 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
 
 
         LADARleft = 19; // 19 is greater than max feet
-        for (LADARi = 140; LADARi <= 145; LADARi++) {
+        for (LADARi = 198; LADARi <= 202; LADARi++) {
             if (ladar_data[LADARi].distance_ping < LADARleft) {
                 LADARleft = ladar_data[LADARi].distance_ping;
             }
         }
+
+        LADARleftfront = 19;
+        for (LADARi = 170; LADARi <= 174 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARleftfront) {
+                LADARleftfront = ladar_data[LADARi].distance_ping;
+            }
+        }
+
         ///////////// Varun Ladar Labview //////////////////////////////////////////////////
 
 
@@ -1403,6 +1442,32 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
                 LADARfront = ladar_data[LADARi].distance_pong;
             }
         }
+
+        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        LADARright = 19; // 19 is greater than max feet
+        for (LADARi = 26; LADARi <= 30 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARright) {
+                LADARright = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+
+        LADARleft = 19; // 19 is greater than max feet
+        for (LADARi = 198; LADARi <= 202; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARleft) {
+                LADARleft = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+        LADARleftfront = 19;
+        for (LADARi = 170; LADARi <= 174 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARleftfront) {
+                LADARleftfront = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+
         LADARxoffset = ROBOTps.x + (LADARps.x*cosf(ROBOTps.theta)-LADARps.y*sinf(ROBOTps.theta - PI/2.0));
         LADARyoffset = ROBOTps.y + (LADARps.x*sinf(ROBOTps.theta)-LADARps.y*cosf(ROBOTps.theta - PI/2.0));
         for (LADARi = 0; LADARi < 228; LADARi++) {
