@@ -291,7 +291,36 @@ int16_t count32 = 0;
 int16_t count34 = 0;
 int16_t count36 = 0;
 
+float AlignmentTolerance = 0.05;
+float MaxAlignmentSpeed = 0.75;
+uint16_t ballCountGreen = 4;
+uint16_t ballCountOrange = 0;
 
+//April Tag Speed Reference
+float alignToAprilTagVref() {
+    if (tagid == 0) {
+        return 0;
+    }
+
+    float colcentroid = tagx - 80;
+    float vref = MaxAlignmentSpeed;
+
+    if (fabs(colcentroid) < AlignmentTolerance) {
+        vref *= 0.5;
+    }
+
+    return vref;
+}
+
+//April Tag Turn Reference
+float alignToAprilTagTurn() {
+    if (tagid == 0) {
+        return 0;
+    }
+
+    float colcentroid = tagx - 80;
+    return KpAprilTag * colcentroid;
+}
 
 void main(void)
 {
@@ -615,10 +644,10 @@ void main(void)
 
             if (readbuttons() == 0) {
 
-                UART_printfLine(1,"tagx:%.2f tagid:%.2f",tagx,tagid);
+                //UART_printfLine(1,"tagx:%.2f tagid:%.2f",tagx,tagid);
 
                 //UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
-                //                UART_printfLine(1,"RobotState:%.2f",RobotState);
+                                UART_printfLine(1,"RobotState:%.2f",RobotState);
                 //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
                 //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
                 //                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
@@ -1068,6 +1097,11 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 RobotState = 30;
             }
 
+            //Find April Tag
+            if (tagid = 3) { //Green ball deposit
+                RobotState = 40;
+            }
+
             break;
         case 10: //Wall Follow
             if (right_wall_follow_state == 1) {
@@ -1149,9 +1183,11 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count24 >= 1000) {
                 count26 = 0;
+                ballCountGreen++;
 
                 //Close gate servo
                 setEPWM6A_RCServo(90.0); //RSA gate
+                setEPWM5B_RCServo(23.0); //RSA indexer
                 RobotState = 26;
             }
 
@@ -1225,7 +1261,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count34 >= 1000) {
                 count36 = 0;
-
+                ballCountOrange++;
                 setEPWM6A_RCServo(90.0); //RSA gate CCloses
 
                 RobotState = 36;
@@ -1255,52 +1291,25 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             //RSA TODO FIX for drop off not pick up balls
             //      Also implement to pick ball size by ID
-        case 40: //TAG Found
-            // put vision code here
+        case 40: // AprilTag Alignment for Drop-Off
+            vref = alignToAprilTagVref();
+            turn = alignToAprilTagTurn();
 
-            //RSA was pseudo code
-            if (MaxColThreshold1 == 0 || MaxAreaThreshold1 < 3){
-                vref = 0;
-                turn = 0;
-            } else{
-                vref = 0.75;
-                colcentroid = tagx - 80;
-                turn = kpvision * (0 - colcentroid);
-                // start kpvision out as 0.05 and kpvision could need to be negative
-            }
-
-
-
-            //RSA case witch 20 -> 22
-            if (MaxRowThreshold1 > 108) {
-                RobotState = 22;
-                //Change indexer to Green Ball side
-
-                //TODO CHANGE INDEXER FOR BALL BY TAGID (CHECK DOUBLE CHECK TAGIDs WE're Usingn)
-                if (tagid == 4) { //GREEN
-                    setEPWM5B_RCServo(-49.0); //RSA indexer (Green -49)
-
-                } else if (tagid == 5) { //ORANG
-                    setEPWM5B_RCServo(23.0); //RSA indexer ( oraneg =23 )
-
-                }
-
-                //Open the gate servo
-                setEPWM6A_RCServo(23.0); //RSA gate
+            if (abs(tagz) < 1) {  //Distance to tag in z direction
+                RobotState = 42;
                 count22 = 0;
             }
-
-
             break;
 
-        case 42: //Waiting for Servo Door
+        case 42:
             vref = 0;
             turn = 0;
 
             count22 += 1;
 
-            if (count22 >= 1000) {
+            if (count22 >= 500) {
                 count24 = 0;
+                setEPWM6A_RCServo(23.0); // Open gate
                 RobotState = 24;
             }
 
@@ -1308,14 +1317,14 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
         case 44: //move to drop off
 
-            vref = 0.5;
+            vref = -0.25;
             turn = 0;
 
             count24 += 1;
 
             if (count24 >= 1000) {
                 count26 = 0;
-
+                ballCountGreen = 0;
 
                 RobotState = 26;
             }
