@@ -178,7 +178,7 @@ pose robotdest[NUMWAYPOINTS];  // array of waypoints for the robot
 uint16_t i = 0;//for loop
 
 uint16_t right_wall_follow_state = 2;  // right follow
-float Kp_front_wall = -1.6; // -1.6 VARUN /////////////////////////////
+float Kp_front_wall = -1.6; // -1.6 VVMZ /////////////////////////////
 float front_turn_velocity = 0.2;
 float left_turn_Stop_threshold = 3.5;
 float Kp_right_wal = -4.0;
@@ -294,16 +294,16 @@ int16_t count42 = 0;
 int16_t count44 = 0;
 int16_t count46 = 0;
 
-//////////// Varun Mapping Code ///////////////////////
+//////////// VVMZ Mapping Code ///////////////////////
 int16_t currentLadar = 0;
 float labviewXObject = 0.0;
 float labviewYObject = 0.0;
 float LADARright = 0.0;
 int16_t usableLadar = 0;
 float LADARleft = 0.0;
-//////////// Varun Mapping Code ///////////////////////
+//////////// VVMZ Mapping Code ///////////////////////
 
-///////////// Varun Left wall following code ////////////
+///////////// VVMZ Left wall following code ////////////
 float left_wall_follow_state = 2;
 float Kp_left_wal = -0.9;
 float ref_left_wall = 1.6;
@@ -312,7 +312,7 @@ float right_turn_Start_threshold = 2.0;
 float LADARleftfront = 0.0;
 float LADARleftback = 0.0;
 
-/////////////Varun Left Wall following ////////////////////////////
+/////////////VVMZ Left Wall following ////////////////////////////
 
 /////////////April Tag ////////////////////////////
 
@@ -1095,7 +1095,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             // vref and turn are the vref and turn returned from xy_control
 
-            if (LADARfront < 1.5) { /////// VARUN changed from 1.2
+            if (LADARfront < 1.5) { /////// VVMZ changed from 1.2
                 vref = 0.2;
                 checkfronttally++;
                 if (checkfronttally > 310) { // check if LADARfront < 1.2 for 310ms or 3 LADAR samples
@@ -1127,7 +1127,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             //            }
 
 
-            ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
+            ///////////// VVMZ LADAR mapping /////////////////////////////////////////////////////
             usableLadar = 0;
             currentLadar++;
 
@@ -1156,7 +1156,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
 
 
-            ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
+            ///////////// VVMZ LADAR mapping /////////////////////////////////////////////////////
 
             if ((tagid == 6.0 && ballCountGreen >= 3) || (tagid == 6.0 && ballCountOrange >= 3)) { //RSA Both colors, differentiate later in case 40s
                 RobotState = 40;
@@ -1197,7 +1197,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
 
         case 11:
-            /////// Varun adding left wall following ////////////////
+            /////// VVMZ adding left wall following ////////////////
 
             if (left_wall_follow_state == 1) {
                 turn = -Kp_front_wall * (14.5 - LADARfront);
@@ -1219,7 +1219,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 }
             }
 
-            //////////////Varun left wall following /////////////////
+            //////////////VVMZ left wall following /////////////////
 
 
             if (turn > turn_saturation) {
@@ -1230,7 +1230,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
 
             WallFollowtime++;
-            if ( (WallFollowtime > 6000) && (LADARfront > 1.5) ) { // VARUN made from 5-6000 cycles
+            if ( (WallFollowtime > 6000) && (LADARfront > 1.5) ) { // VVMZ made from 5-6000 cycles
                 RobotState = 1;
                 checkfronttally = 0;
             }
@@ -1453,7 +1453,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         RightWheel_1 = RightWheel;
 
 
-        ////////// Varun changed values beign sent to labview ////////////////////
+        ////////// VVMZ changed values beign sent to labview ////////////////////
         if((timecount%250) == 0) {
             DataToLabView.floatData[0] = ROBOTps.x;
             DataToLabView.floatData[1] = ROBOTps.y;
@@ -1525,7 +1525,7 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
     GpioDataRegs.GPATOGGLE.bit.GPIO22 = 1;
     if (LADARpingpong == 1) {
         // LADARrightfront is the min of dist 52, 53, 54, 55, 56
-        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        ///////////// VVMZ Ladar Labview //////////////////////////////////////////////////
         LADARright = 19; // 19 is greater than max feet
         for (LADARi = 26; LADARi <= 30 ; LADARi++) {
             if (ladar_data[LADARi].distance_ping < LADARright) {
@@ -1555,7 +1555,7 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
             }
         }
 
-        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        ///////////// VVMZ Ladar Labview //////////////////////////////////////////////////
 
 
         LADARrightfront = 19; // 19 is greater than max feet
@@ -1595,7 +1595,7 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
             }
         }
 
-        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        ///////////// VVMZ Ladar Labview //////////////////////////////////////////////////
         LADARright = 19; // 19 is greater than max feet
         for (LADARi = 26; LADARi <= 30 ; LADARi++) {
             if (ladar_data[LADARi].distance_pong < LADARright) {
@@ -1625,7 +1625,7 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
             }
         }
 
-        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        ///////////// VVMZ Ladar Labview //////////////////////////////////////////////////
 
         LADARxoffset = ROBOTps.x + (LADARps.x*cosf(ROBOTps.theta)-LADARps.y*sinf(ROBOTps.theta - PI/2.0));
         LADARyoffset = ROBOTps.y + (LADARps.x*sinf(ROBOTps.theta)-LADARps.y*cosf(ROBOTps.theta - PI/2.0));
