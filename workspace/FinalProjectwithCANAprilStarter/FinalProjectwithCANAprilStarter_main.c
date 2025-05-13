@@ -70,8 +70,8 @@ extern uint16_t rxMsgData[8];
 
 uint32_t dis_raw_1[2];
 uint32_t dis_raw_2[2];
-float dis_1 = 0;
-float dis_2 = 0;
+uint32_t dis_1 = 0;
+uint32_t dis_2 = 0;
 
 uint32_t quality_raw_1[4];
 uint32_t quality_raw_2[4];
@@ -126,7 +126,6 @@ extern float fromCAMvaluesThreshold2[CAMNUM_FROM_FLOATS];
 extern uint16_t NewCAMDataAprilTag1;  // Flag new data
 extern float fromCAMvaluesAprilTag1[CAMNUM_FROM_FLOATS];
 
-//April Tag Items
 float tagid = 0;
 float tagx = 0;
 float tagy = 0;
@@ -179,11 +178,11 @@ pose robotdest[NUMWAYPOINTS];  // array of waypoints for the robot
 uint16_t i = 0;//for loop
 
 uint16_t right_wall_follow_state = 2;  // right follow
-float Kp_front_wall = -2.0;
+float Kp_front_wall = -1.6; // -1.6 VARUN /////////////////////////////
 float front_turn_velocity = 0.2;
 float left_turn_Stop_threshold = 3.5;
 float Kp_right_wal = -4.0;
-float ref_right_wall = 1.1;
+float ref_right_wall = 1.1; // 1.1
 float foward_velocity = 1.0;
 float left_turn_Start_threshold = 1.3;
 float turn_saturation = 2.5;
@@ -282,7 +281,7 @@ uint16_t MPU9250ignoreCNT = 0;  //This is ignoring the first few interrupts if A
 float RCangle = 0.0;
 
 float colcentroid = 0.0;
-float kpvision = -0.05;
+float kpvision = -0.10;
 int16_t count22 = 0;
 int16_t count24 = 0;
 int16_t count26 = 0;
@@ -290,37 +289,65 @@ int16_t count1 =  2000;
 int16_t count32 = 0;
 int16_t count34 = 0;
 int16_t count36 = 0;
+int16_t count40 = 0;
+int16_t count42 = 0;
+int16_t count44 = 0;
+int16_t count46 = 0;
+
+//////////// Varun Mapping Code ///////////////////////
+int16_t currentLadar = 0;
+float labviewXObject = 0.0;
+float labviewYObject = 0.0;
+float LADARright = 0.0;
+int16_t usableLadar = 0;
+float LADARleft = 0.0;
+//////////// Varun Mapping Code ///////////////////////
+
+///////////// Varun Left wall following code ////////////
+float left_wall_follow_state = 2;
+float Kp_left_wal = -0.9;
+float ref_left_wall = 1.6;
+float right_turn_Stop_threshold = 4.5;
+float right_turn_Start_threshold = 2.0;
+float LADARleftfront = 0.0;
+float LADARleftback = 0.0;
+
+/////////////Varun Left Wall following ////////////////////////////
+
+/////////////April Tag ////////////////////////////
 
 float AlignmentTolerance = 0.05;
 float MaxAlignmentSpeed = 0.75;
-uint16_t ballCountGreen = 4;
+uint16_t ballCountGreen = 3;
 uint16_t ballCountOrange = 0;
 
-//April Tag Speed Reference
-float alignToAprilTagVref() {
-    if (tagid == 0) {
-        return 0;
-    }
+////April Tag Speed Reference
+//float alignToAprilTagVref() {
+//    if (tagid == 0) {
+//        return 0;
+//    }
+//
+//    float colcentroid = tagx - 80;
+//    float vref = MaxAlignmentSpeed;
+//
+//    if (fabs(colcentroid) < AlignmentTolerance) {
+//        vref *= 0.5;
+//    }
+//
+//    return vref;
+//}
+//
+////April Tag Turn Reference
+//float alignToAprilTagTurn() {
+//    if (tagid == 0) {
+//        return 0;
+//    }
+//
+//    float colcentroid = tagx - 80;
+//    return -(KpAprilTag * colcentroid);
+//}
 
-    float colcentroid = tagx - 80;
-    float vref = MaxAlignmentSpeed;
-
-    if (fabs(colcentroid) < AlignmentTolerance) {
-        vref *= 0.5;
-    }
-
-    return vref;
-}
-
-//April Tag Turn Reference
-float alignToAprilTagTurn() {
-    if (tagid == 0) {
-        return 0;
-    }
-
-    float colcentroid = tagx - 80;
-    return KpAprilTag * colcentroid;
-}
+/////////////April Tag ////////////////////////////
 
 void main(void)
 {
@@ -471,9 +498,6 @@ void main(void)
     EPwm4Regs.ETSEL.bit.SOCAEN = 1; //enable SOCA
     //EPwm4Regs.TBCTL.bit.CTRMODE = 0; //unfreeze,  wait to do this right before enabling interrupts
     EDIS;
-
-    //TODO
-    //Include Servo Setup from lab 6? For the two servo motors (3 for index, 4 for opening)
 
     // Enable CPU int1 which is connected to CPU-Timer 0, CPU int13
     // which is connected to CPU-Timer 1, and CPU int 14, which is connected
@@ -643,11 +667,10 @@ void main(void)
         if (UARTPrint == 1 ) {
 
             if (readbuttons() == 0) {
+                //                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
+                UART_printfLine(1,"c:%d t:%.0f, z:%.0f", RobotState, tagid,tagz);
 
-                //UART_printfLine(1,"tagx:%.2f tagid:%.2f",tagx,tagid);
 
-                //UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
-                                UART_printfLine(1,"RobotState:%.2f",RobotState);
                 //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
                 //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
                 //                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
@@ -676,7 +699,7 @@ void main(void)
                 UART_printfLine(1,"Ox:%.2f:Oy:%.2f:Oa%.2f",OPTITRACKps.x,OPTITRACKps.y,OPTITRACKps.theta);
                 UART_printfLine(2,"State:%d : %d",RobotState,statePos);
             } else if (readbuttons() == 6) {
-                UART_printfLine(1,"D1 %.2f D2 %.2f",dis_1,dis_2);
+                UART_printfLine(1,"D1 %ld D2 %ld",dis_1,dis_2);
                 UART_printfLine(2,"St1 %ld St2 %ld",measure_status_1,measure_status_2);
             } else if (readbuttons() == 7) {
                 UART_printfLine(1,"%.0f,%.1f,%.1f,%.1f",tagid,tagx,tagy,tagz);
@@ -794,11 +817,11 @@ __interrupt void cpu_timer2_isr(void)
 
     CpuTimer2.InterruptCount++;
     RCangle = readEncWheel();
-    //    setEPWM3A_RCServo(RCangle);
-    //    setEPWM3B_RCServo(RCangle);
-    //    setEPWM5A_RCServo(RCangle);
-    //    setEPWM5B_RCServo(RCangle); //RSA indexer
-    //    setEPWM6A_RCServo(RCangle); //RSA gate
+    setEPWM3A_RCServo(RCangle);
+    setEPWM3B_RCServo(RCangle);
+    setEPWM5A_RCServo(RCangle);
+    setEPWM5B_RCServo(RCangle);
+    setEPWM6A_RCServo(RCangle);
     if ((CpuTimer2.InterruptCount % 10) == 0) {
         UARTPrint = 1;
     }
@@ -951,7 +974,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             if ((numThres1 % 5) == 0) {
                 // LED4 is GPIO97
                 GpioDataRegs.GPDTOGGLE.bit.GPIO97 = 1;
-            }			
+            }
         }
         distToBall1 = cubeFit[0] * (MaxRowThreshold1 * MaxRowThreshold1 * MaxRowThreshold1) + cubeFit[1]* (MaxRowThreshold1 * MaxRowThreshold1) + cubeFit[2]* (MaxRowThreshold1) + cubeFit[3];
         if (NewCAMDataThreshold2 == 1) {
@@ -971,11 +994,10 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             if ((numThres2 % 5) == 0) {
                 // LED5 is GPIO111
                 GpioDataRegs.GPDTOGGLE.bit.GPIO111 = 1;
-            }			
+            }
         }
         distToBall2 = cubeFit[0]* (MaxRowThreshold2 * MaxRowThreshold2 * MaxRowThreshold2) + cubeFit[1]* (MaxRowThreshold2 * MaxRowThreshold2) + cubeFit[2]* (MaxRowThreshold2) + cubeFit[3];
 
-        //RSA GIVEN APRIL TAG CODE
         if (NewCAMDataAprilTag1 == 1) {
             NewCAMDataAprilTag1 = 0;
             tagx = fromCAMvaluesAprilTag1[0];
@@ -1067,19 +1089,26 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             statePos = (statePos+1)%NUMWAYPOINTS;
         }
         // state machine
-        //        RobotState = 20; //RSA aaaddded
+        //        RobotState = 20; //RSA addded
         switch (RobotState) {
-        case 1: //Move Forwards
+        case 1:
 
             // vref and turn are the vref and turn returned from xy_control
 
-            if (LADARfront < 1.2) {
+            if (LADARfront < 1.5) { /////// VARUN changed from 1.2
                 vref = 0.2;
                 checkfronttally++;
                 if (checkfronttally > 310) { // check if LADARfront < 1.2 for 310ms or 3 LADAR samples
-                    RobotState = 10; // Wall follow
                     WallFollowtime = 0;
-                    right_wall_follow_state = 1;
+                    if (LADARleftfront >= LADARrightfront) {
+                        right_wall_follow_state = 1;
+                        RobotState = 10;
+                    }
+                    else {
+                        left_wall_follow_state = 1;
+                        RobotState = 11;
+                    }
+
                 }
             } else {
                 checkfronttally = 0;
@@ -1092,18 +1121,49 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 RobotState = 20;
             }
             //            RSA case switch 1 to 30 ORANGE BALL
-            if (MaxAreaThreshold2 > 20 && count1 > 2000) {
+            //            if (MaxAreaThreshold2 > 20 && count1 > 2000) {
+            //
+            //                RobotState = 30;
+            //            }
 
-                RobotState = 30;
+
+            ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
+            usableLadar = 0;
+            currentLadar++;
+
+            if ((currentLadar % 3) == 0) { // look at objects to the right
+                labviewXObject = ROBOTps.x + LADARright * cos(PI/2 - ROBOTps.theta);
+                labviewYObject = ROBOTps.y - LADARright * sin(PI/2 - ROBOTps.theta);
+                if (LADARright <= 3) {// mapping objects 2ft away
+                    usableLadar = 1;
+                }
+            }
+            //            if ((currentLadar % 3) == 1) { // look at objects in front
+            //                labviewXObject = ROBOTps.x + LADARfront * cos(ROBOTps.theta);
+            //                labviewYObject = ROBOTps.y +LADARfront * sin(ROBOTps.theta);
+            //                if (LADARfront <= 3) {// mapping objects 2ft away
+            //                    usableLadar = 1;
+            //                }
+            //            }
+            else //((currentLadar % 3) == 2) { // look at objects to the left
+            {
+                labviewXObject = ROBOTps.x - LADARleft * cos(PI/2 - ROBOTps.theta);
+                labviewYObject = ROBOTps.y + LADARleft * sin(PI/2 - ROBOTps.theta);
+                if (LADARleft <= 3) {// mapping objects 2ft away
+                    usableLadar = 1;
+                }
             }
 
-            //Find April Tag
-            if (tagid = 3) { //Green ball deposit
+
+
+            ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
+
+            if ((tagid == 6.0 && ballCountGreen >= 3) || (tagid == 6.0 && ballCountOrange >= 3)) { //RSA Both colors, differentiate later in case 40s
                 RobotState = 40;
             }
 
             break;
-        case 10: //Wall Follow
+        case 10:
             if (right_wall_follow_state == 1) {
                 //Left Turn
                 turn = Kp_front_wall*(14.5 - LADARfront);
@@ -1119,6 +1179,8 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                     right_wall_follow_state = 1;
                 }
             }
+
+
             if (turn > turn_saturation) {
                 turn = turn_saturation;
             }
@@ -1133,10 +1195,53 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
             break;
 
-        case 20: //Green Ball Found
-            // put vision code here
 
-            //RSA was pseudo code
+        case 11:
+            /////// Varun adding left wall following ////////////////
+
+            if (left_wall_follow_state == 1) {
+                turn = -Kp_front_wall * (14.5 - LADARfront);
+                vref = front_turn_velocity;
+                if (LADARfront > right_turn_Stop_threshold) {
+                    left_wall_follow_state = 2;
+                }
+            }
+            else if (left_wall_follow_state == 2) {
+                turn = -Kp_left_wal * (ref_left_wall - LADARleftfront);
+                vref = foward_velocity;
+                if (LADARfront < right_turn_Start_threshold) {
+                    left_wall_follow_state = 1;
+                }
+                if (LADARleftfront > 2.5){
+                    if (LADARleftback < 1.0) {
+                        turn = Kp_left_wal*(ref_left_wall - LADARleftback);
+                    }
+                }
+            }
+
+            //////////////Varun left wall following /////////////////
+
+
+            if (turn > turn_saturation) {
+                turn = turn_saturation;
+            }
+            if (turn < -turn_saturation) {
+                turn = -turn_saturation;
+            }
+
+            WallFollowtime++;
+            if ( (WallFollowtime > 6000) && (LADARfront > 1.5) ) { // VARUN made from 5-6000 cycles
+                RobotState = 1;
+                checkfronttally = 0;
+            }
+            break;
+
+            /////////////////////////////////////////////////////////////////////////////////////////////////
+            //Green Ball Code
+        case 20:
+            //            // put vision code here
+            //
+            //            //RSA was pseudo code
             if (MaxColThreshold1 == 0 || MaxAreaThreshold1 < 3){
                 vref = 0;
                 turn = 0;
@@ -1158,10 +1263,9 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 count22 = 0;
             }
 
-
             break;
 
-        case 22: //Waiting for Servo Door
+        case 22:
             vref = 0;
             turn = 0;
 
@@ -1169,12 +1273,13 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count22 >= 1000) {
                 count24 = 0;
+
                 RobotState = 24;
             }
 
             break;
 
-        case 24: //Collect Ball
+        case 24:
 
             vref = 0.5;
             turn = 0;
@@ -1183,18 +1288,12 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count24 >= 1000) {
                 count26 = 0;
-                ballCountGreen++;
-
-                //Close gate servo
-                setEPWM6A_RCServo(90.0); //RSA gate
-                setEPWM5B_RCServo(23.0); //RSA indexer
                 RobotState = 26;
             }
 
             break;
 
-        case 26: //Wait to Close Servo Door
-
+        case 26:
             vref = 0;
             turn = 0;
 
@@ -1207,9 +1306,11 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             break;
 
-        case 30: //ORANGE for the rest
+            /////////////////////////////////////////////////////////////////////////////////////////////////
+            //Orange Ball Code
+        case 30:
             // put vision code here
-
+            //            RobotState = 1;
             //RSA was pseudo code
             if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
                 vref = 0;
@@ -1224,11 +1325,6 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             //RSA case witch 20 -> 22
             if (MaxRowThreshold2 > 108) {
                 RobotState = 32;
-                //Change indexer to ORANGE Ball side
-                setEPWM5B_RCServo(23.0); //RSA indexer
-
-                //Open the gate servo
-                setEPWM6A_RCServo(23.0); //RSA gate
                 count32 = 0;
             }
 
@@ -1236,7 +1332,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             break;
 
         case 32:
-
+            //            RobotState = 1;
             vref = 0;
             turn = 0;
 
@@ -1244,16 +1340,13 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count32 >= 1000) {
                 count34 = 0;
-                //TODO
-                //Change indexer to Green Ball side
-                //Open the gate servo
                 RobotState = 34;
             }
 
             break;
 
         case 34:
-
+            //            RobotState = 1;
             vref = 0.5;
             turn = 0;
 
@@ -1261,16 +1354,13 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count34 >= 1000) {
                 count36 = 0;
-                ballCountOrange++;
-                setEPWM6A_RCServo(90.0); //RSA gate CCloses
-
                 RobotState = 36;
             }
 
             break;
 
         case 36:
-
+            //            RobotState = 1;
             vref = 0;
             turn = 0;
 
@@ -1278,13 +1368,10 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count36 >= 1000) {
                 count1 = 0;
-                //TODO
-                //Close gate servo
                 RobotState = 1;
             }
 
             break;
-
 
             //RSA ON APRIL TAGS
             //rSA :: MAKE SURE     runtag = 1 #set this to 1 if you want to look for april tags ::: IN OPENMV main.py
@@ -1292,12 +1379,15 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             //RSA TODO FIX for drop off not pick up balls
             //      Also implement to pick ball size by ID
         case 40: // AprilTag Alignment for Drop-Off
-            vref = alignToAprilTagVref();
-            turn = alignToAprilTagTurn();
-
-            if (abs(tagz) < 1) {  //Distance to tag in z direction
+            if (abs(tagz) < 5 && abs(tagz) > 1){
+                vref = 0;
+                turn = 0;
                 RobotState = 42;
-                count22 = 0;
+                count42 = 0;
+            } else {
+                vref = 0.50;
+                turn = (kpvision)* (0-tagx); //RSA doubled KPviosion
+                // start kpvision out as 0.05 and kpvision could need to be negative
             }
             break;
 
@@ -1305,41 +1395,40 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             vref = 0;
             turn = 0;
 
-            count22 += 1;
+            count42 += 1;
 
-            if (count22 >= 500) {
-                count24 = 0;
+            if (count42 >= 2000) {
+                count44 = 0;
                 setEPWM6A_RCServo(23.0); // Open gate
-                RobotState = 24;
+                RobotState = 44;
             }
 
             break;
 
         case 44: //move to drop off
 
-            vref = -0.25;
+            vref = -0.50;
             turn = 0;
 
-            count24 += 1;
+            count44 += 1;
 
-            if (count24 >= 1000) {
-                count26 = 0;
+            if (count44 >= 2000) {
+                count46 = 0;
                 ballCountGreen = 0;
 
-                RobotState = 26;
+                RobotState = 46;
             }
 
             break;
 
-        case 46: //BACK UP :: then (?) Wait to Close Servo Door (?)
+        case 46:
 
-            vref = -0.75;
-            //vref = 0;
+            vref = 0;
             turn = 0;
 
-            count26 += 1;
+            count46 += 1;
 
-            if (count26 >= 1000) {
+            if (count46 >= 2000) {
                 count1 = 0;
                 //Close gate servo
                 setEPWM6A_RCServo(90.0); //RSA gate
@@ -1347,9 +1436,6 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             }
 
             break;
-
-
-
 
         default:
             break;
@@ -1366,12 +1452,14 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
         LeftWheel_1 = LeftWheel;
         RightWheel_1 = RightWheel;
 
+
+        ////////// Varun changed values beign sent to labview ////////////////////
         if((timecount%250) == 0) {
             DataToLabView.floatData[0] = ROBOTps.x;
             DataToLabView.floatData[1] = ROBOTps.y;
-            DataToLabView.floatData[2] = ROBOTps.theta;
-            DataToLabView.floatData[3] = (float)timecount;
-            DataToLabView.floatData[4] = 0.5*(LeftVel + RightVel);
+            DataToLabView.floatData[2] = labviewXObject;
+            DataToLabView.floatData[3] = labviewYObject;
+            DataToLabView.floatData[4] = usableLadar;
             DataToLabView.floatData[5] = (float)RobotState;
             DataToLabView.floatData[6] = (float)statePos;
             DataToLabView.floatData[7] = LADARfront;
@@ -1437,6 +1525,39 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
     GpioDataRegs.GPATOGGLE.bit.GPIO22 = 1;
     if (LADARpingpong == 1) {
         // LADARrightfront is the min of dist 52, 53, 54, 55, 56
+        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        LADARright = 19; // 19 is greater than max feet
+        for (LADARi = 26; LADARi <= 30 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARright) {
+                LADARright = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+
+        LADARleft = 19; // 19 is greater than max feet
+        for (LADARi = 198; LADARi <= 202; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARleft) {
+                LADARleft = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+        LADARleftfront = 19;
+        for (LADARi = 170; LADARi <= 174 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARleftfront) {
+                LADARleftfront = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+        LADARleftback = 19;
+        for (LADARi = 215; LADARi <= 219 ; LADARi++) {
+            if (ladar_data[LADARi].distance_ping < LADARleftback) {
+                LADARleftback = ladar_data[LADARi].distance_ping;
+            }
+        }
+
+        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+
+
         LADARrightfront = 19; // 19 is greater than max feet
         for (LADARi = 52; LADARi <= 56 ; LADARi++) {
             if (ladar_data[LADARi].distance_ping < LADARrightfront) {
@@ -1473,6 +1594,39 @@ __interrupt void SWI2_MiddlePriority(void)     // RAM_CORRECTABLE_ERROR
                 LADARfront = ladar_data[LADARi].distance_pong;
             }
         }
+
+        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+        LADARright = 19; // 19 is greater than max feet
+        for (LADARi = 26; LADARi <= 30 ; LADARi++) {
+            if (ladar_data[LADARi].distance_pong < LADARright) {
+                LADARright = ladar_data[LADARi].distance_pong;
+            }
+        }
+
+
+        LADARleft = 19; // 19 is greater than max feet
+        for (LADARi = 198; LADARi <= 202; LADARi++) {
+            if (ladar_data[LADARi].distance_pong < LADARleft) {
+                LADARleft = ladar_data[LADARi].distance_pong;
+            }
+        }
+
+        LADARleftfront = 19;
+        for (LADARi = 170; LADARi <= 174 ; LADARi++) {
+            if (ladar_data[LADARi].distance_pong < LADARleftfront) {
+                LADARleftfront = ladar_data[LADARi].distance_pong;
+            }
+        }
+
+        LADARleftback = 19;
+        for (LADARi = 215; LADARi <= 219 ; LADARi++) {
+            if (ladar_data[LADARi].distance_pong < LADARleftback) {
+                LADARleftback = ladar_data[LADARi].distance_pong;
+            }
+        }
+
+        ///////////// Varun Ladar Labview //////////////////////////////////////////////////
+
         LADARxoffset = ROBOTps.x + (LADARps.x*cosf(ROBOTps.theta)-LADARps.y*sinf(ROBOTps.theta - PI/2.0));
         LADARyoffset = ROBOTps.y + (LADARps.x*sinf(ROBOTps.theta)-LADARps.y*cosf(ROBOTps.theta - PI/2.0));
         for (LADARi = 0; LADARi < 228; LADARi++) {
@@ -1564,7 +1718,7 @@ __interrupt void can_isr(void)
             dis_raw_1[i] = rxMsgData[i];
         }
 
-        dis_1 = (0.22/530)*(256*dis_raw_1[1] + dis_raw_1[0]);
+        dis_1 = 256*dis_raw_1[1] + dis_raw_1[0];
 
         measure_status_1 = rxMsgData[2];
 
@@ -1600,7 +1754,7 @@ __interrupt void can_isr(void)
             dis_raw_2[i] = rxMsgData[i];
         }
 
-        dis_2 = (0.22/530)*(256*dis_raw_2[1] + dis_raw_2[0]);
+        dis_2 = 256*dis_raw_2[1] + dis_raw_2[0];
 
         measure_status_2 = rxMsgData[2];
 

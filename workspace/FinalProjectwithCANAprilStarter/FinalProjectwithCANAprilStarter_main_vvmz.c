@@ -1121,10 +1121,10 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 RobotState = 20;
             }
             //            RSA case switch 1 to 30 ORANGE BALL
-//            if (MaxAreaThreshold2 > 20 && count1 > 2000) {
-//
-//                RobotState = 30;
-//            }
+            //            if (MaxAreaThreshold2 > 20 && count1 > 2000) {
+            //
+            //                RobotState = 30;
+            //            }
 
 
             ///////////// Varun LADAR mapping /////////////////////////////////////////////////////
@@ -1255,6 +1255,11 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             //RSA case witch 20 -> 22
             if (MaxRowThreshold1 > 108) {
                 RobotState = 22;
+                //Change indexer to Green Ball side
+                setEPWM5B_RCServo(-49.0); //RSA indexer
+
+                //Open the gate servo
+                setEPWM6A_RCServo(23.0); //RSA gate
                 count22 = 0;
             }
 
@@ -1268,6 +1273,7 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
             if (count22 >= 1000) {
                 count24 = 0;
+
                 RobotState = 24;
             }
 
@@ -1304,66 +1310,66 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
             //Orange Ball Code
         case 30:
             // put vision code here
-//            RobotState = 1;
-                        //RSA was pseudo code
-                        if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
-                            vref = 0;
-                            turn = 0;
-                        } else{
-                            vref = 0.75;
-                            colcentroid = MaxColThreshold2 - 80;
-                            turn = kpvision * (0 - colcentroid);
-                            // start kpvision out as 0.05 and kpvision could need to be negative
-                        }
+            //            RobotState = 1;
+            //RSA was pseudo code
+            if (MaxColThreshold2 == 0 || MaxAreaThreshold2 < 3){
+                vref = 0;
+                turn = 0;
+            } else{
+                vref = 0.75;
+                colcentroid = MaxColThreshold2 - 80;
+                turn = kpvision * (0 - colcentroid);
+                // start kpvision out as 0.05 and kpvision could need to be negative
+            }
 
-                        //RSA case witch 20 -> 22
-                        if (MaxRowThreshold2 > 108) {
-                            RobotState = 32;
-                            count32 = 0;
-                        }
+            //RSA case witch 20 -> 22
+            if (MaxRowThreshold2 > 108) {
+                RobotState = 32;
+                count32 = 0;
+            }
 
 
             break;
 
         case 32:
-//            RobotState = 1;
-                        vref = 0;
-                        turn = 0;
+            //            RobotState = 1;
+            vref = 0;
+            turn = 0;
 
-                        count32 += 1;
+            count32 += 1;
 
-                        if (count32 >= 1000) {
-                            count34 = 0;
-                            RobotState = 34;
-                        }
+            if (count32 >= 1000) {
+                count34 = 0;
+                RobotState = 34;
+            }
 
             break;
 
         case 34:
-//            RobotState = 1;
-                        vref = 0.5;
-                        turn = 0;
+            //            RobotState = 1;
+            vref = 0.5;
+            turn = 0;
 
-                        count34 += 1;
+            count34 += 1;
 
-                        if (count34 >= 1000) {
-                            count36 = 0;
-                            RobotState = 36;
-                        }
+            if (count34 >= 1000) {
+                count36 = 0;
+                RobotState = 36;
+            }
 
             break;
 
         case 36:
-//            RobotState = 1;
-                        vref = 0;
-                        turn = 0;
+            //            RobotState = 1;
+            vref = 0;
+            turn = 0;
 
-                        count36 += 1;
+            count36 += 1;
 
-                        if (count36 >= 1000) {
-                            count1 = 0;
-                            RobotState = 1;
-                        }
+            if (count36 >= 1000) {
+                count1 = 0;
+                RobotState = 1;
+            }
 
             break;
 
