@@ -183,7 +183,6 @@ float front_turn_velocity = 0.2;
 float left_turn_Stop_threshold = 3.5;
 float Kp_right_wal = -4.0;
 float ref_right_wall = 1.1; // 1.1
-float ref_right_wall = 1.1; // 1.1
 float foward_velocity = 1.0;
 float left_turn_Start_threshold = 1.3;
 float turn_saturation = 2.5;
@@ -295,7 +294,6 @@ int16_t count42 = 0;
 int16_t count44 = 0;
 int16_t count46 = 0;
 
-
 //////////// VVMZ Mapping Code ///////////////////////
 int16_t currentLadar = 0;
 float labviewXObject = 0.0;
@@ -304,17 +302,6 @@ float LADARright = 0.0;
 int16_t usableLadar = 0;
 float LADARleft = 0.0;
 //////////// VVMZ Mapping Code ///////////////////////
-
-///////////// VVMZ Left wall following code ////////////
-float left_wall_follow_state = 2;
-float Kp_left_wal = -0.9;
-float ref_left_wall = 1.6;
-float right_turn_Stop_threshold = 4.5;
-float right_turn_Start_threshold = 2.0;
-float LADARleftfront = 0.0;
-float LADARleftback = 0.0;
-
-/////////////VVMZ Left Wall following ////////////////////////////
 
 ///////////// VVMZ Left wall following code ////////////
 float left_wall_follow_state = 2;
@@ -681,11 +668,11 @@ void main(void)
 
             if (readbuttons() == 0) {
                 //                UART_printfLine(1,"EncW:%.2f ang:%.2f",readEncWheel(),RCangle);
-                UART_printfLine(1,"case:%d", RobotState);
+                UART_printfLine(1,"c:%d t:%.0f, z:%.0f", RobotState, tagid,tagz);
+
 
                 //                UART_printfLine(1,"x:%.2f:y:%.2f:a%.2f",ROBOTps.x,ROBOTps.y,ROBOTps.theta);
                 //                UART_printfLine(2,"F%.4f R%.4f",LADARfront,LADARrightfront);
-                //                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
                 //                UART_printfLine(1,"d1:%.2f d2:%.2f",distToBall1,distToBall2);
             } else if (readbuttons() == 1) {
                 UART_printfLine(1,"O1A:%.0fC:%.0fR:%.0f",MaxAreaThreshold1,MaxColThreshold1,MaxRowThreshold1);
@@ -1134,13 +1121,11 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 RobotState = 20;
             }
             //            RSA case switch 1 to 30 ORANGE BALL
-            if (MaxAreaThreshold2 > 20 && count1 > 2000) {
+            //            if (MaxAreaThreshold2 > 20 && count1 > 2000) {
+            //
+            //                RobotState = 30;
+            //            }
 
-            ///////////// VVMZ LADAR mapping /////////////////////////////////////////////////////
-
-            if ((tagid == 6.0 && ballCountGreen >= 3) || (tagid == 6.0 && ballCountOrange >= 3)) { //RSA Both colors, differentiate later in case 40s
-                RobotState = 40;
-            }
 
             ///////////// VVMZ LADAR mapping /////////////////////////////////////////////////////
             usableLadar = 0;
@@ -1171,38 +1156,11 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
 
 
 
-
-
-//             ///////////// VVMZ LADAR mapping /////////////////////////////////////////////////////
-//             usableLadar = 0;
-//             currentLadar++;
-
-//             if ((currentLadar % 3) == 0) { // look at objects to the right
-//                 labviewXObject = ROBOTps.x + LADARright * cos(PI/2 - ROBOTps.theta);
-//                 labviewYObject = ROBOTps.y - LADARright * sin(PI/2 - ROBOTps.theta);
-//                 if (LADARright <= 3) {// mapping objects 2ft away
-//                     usableLadar = 1;
-//                 }
-//             }
-// //            if ((currentLadar % 3) == 1) { // look at objects in front
-// //                labviewXObject = ROBOTps.x + LADARfront * cos(ROBOTps.theta);
-// //                labviewYObject = ROBOTps.y +LADARfront * sin(ROBOTps.theta);
-// //                if (LADARfront <= 3) {// mapping objects 2ft away
-// //                    usableLadar = 1;
-// //                }
-// //            }
-//             else //((currentLadar % 3) == 2) { // look at objects to the left
-//             {
-//                 labviewXObject = ROBOTps.x - LADARleft * cos(PI/2 - ROBOTps.theta);
-//                 labviewYObject = ROBOTps.y + LADARleft * sin(PI/2 - ROBOTps.theta);
-//                 if (LADARleft <= 3) {// mapping objects 2ft away
-//                     usableLadar = 1;
-//                 }
-//             }
-
-
-
             ///////////// VVMZ LADAR mapping /////////////////////////////////////////////////////
+
+            if ((tagid == 6.0 && ballCountGreen >= 3) || (tagid == 6.0 && ballCountOrange >= 3)) { //RSA Both colors, differentiate later in case 40s
+                RobotState = 40;
+            }
 
             break;
         case 10:
@@ -1221,6 +1179,8 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                     right_wall_follow_state = 1;
                 }
             }
+
+
             if (turn > turn_saturation) {
                 turn = turn_saturation;
             }
@@ -1292,76 +1252,45 @@ __interrupt void SWI1_HighestPriority(void)     // EMIF_ERROR
                 // start kpvision out as 0.05 and kpvision could need to be negative
             }
 
-            if (left_wall_follow_state == 1) {
-                turn = -Kp_front_wall * (14.5 - LADARfront);
-                vref = front_turn_velocity;
-                if (LADARfront > right_turn_Stop_threshold) {
-                    left_wall_follow_state = 2;
-                }
-            }
-            else if (left_wall_follow_state == 2) {
-                turn = -Kp_left_wal * (ref_left_wall - LADARleftfront);
-                vref = foward_velocity;
-                if (LADARfront < right_turn_Start_threshold) {
-                    left_wall_follow_state = 1;
+            //RSA case witch 20 -> 22
+            if (MaxRowThreshold1 > 108) {
+                RobotState = 22;
                 //Change indexer to Green Ball side
                 setEPWM5B_RCServo(-49.0); //RSA indexer
 
                 //Open the gate servo
                 setEPWM6A_RCServo(23.0); //RSA gate
-                }
-                if (LADARleftfront > 2.5){
-                    if (LADARleftback < 1.0) {
-                        turn = Kp_left_wal*(ref_left_wall - LADARleftback);
-                    }
-                }
+                count22 = 0;
             }
 
-            //////////////VVMZ left wall following /////////////////
-
-
-            if (turn > turn_saturation) {
-                turn = turn_saturation;
-            }
-            if (turn < -turn_saturation) {
-                turn = -turn_saturation;
-            }
-            WallFollowtime++;
-            if ( (WallFollowtime > 6000) && (LADARfront > 1.5) ) { // VVMZ made from 5-6000 cycles
-                RobotState = 1;
-                checkfronttally = 0;
-            }
             break;
 
-       
         case 22:
-            RobotState = 1;
-//            vref = 0;
-//            turn = 0;
-//
-//            count22 += 1;
-//
-//            if (count22 >= 1000) {
-//                count24 = 0;
-//                RobotState = 24;
-//            }
-//
+            vref = 0;
+            turn = 0;
+
+            count22 += 1;
+
+            if (count22 >= 1000) {
+                count24 = 0;
+
+                RobotState = 24;
+            }
+
             break;
 
         case 24:
 
-            RobotState = 1;
+            vref = 0.5;
+            turn = 0;
 
-//            vref = 0.5;
-//            turn = 0;
-//
-//            count24 += 1;
-//
-//            if (count24 >= 1000) {
-//                count26 = 0;
-//                RobotState = 26;
-//            }
-//
+            count24 += 1;
+
+            if (count24 >= 1000) {
+                count26 = 0;
+                RobotState = 26;
+            }
+
             break;
 
         case 26:
